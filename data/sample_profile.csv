@@ -1,0 +1,7 @@
+kernel_name,runtime_ms,flops,dram_read_bytes,dram_write_bytes,memory_access_pattern,notes
+vector_add,0.90,100000000,240000000,80000000,regular,Element-wise vector addition with streaming memory access
+matrix_mul_naive,2.40,12000000000,1200000000,16000000,regular,Naive GEMM with poor data reuse compared to tiled implementation
+matrix_mul_tiled,12.00,120000000000,750000000,16000000,regular,Tiled GEMM with high data reuse
+reduction,0.75,80000000,640000000,4000000,regular,Parallel reduction with moderate synchronization and memory traffic
+embedding_lookup,4.00,60000000,2500000000,120000000,irregular,Random table lookup dominated by memory movement
+bitwise_and_bulk,6.00,80000000,3200000000,1600000000,regular,Bulk bitwise operation over large arrays
