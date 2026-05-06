@@ -31,6 +31,8 @@ def build_summary_table(profile: pd.DataFrame) -> pd.DataFrame:
             "over_roofline": profile["exceeds_roofline"].map(lambda value: "yes" if value else "no"),
             "bottleneck": profile["bottleneck_classification"],
             "PIM/NMP": profile["pim_nmp_suitability"],
+            "PIM_score": profile["pim_nmp_score"],
+            "score_reason": profile["pim_nmp_score_reason"],
             "recommendation": profile["recommendation"],
         }
     )

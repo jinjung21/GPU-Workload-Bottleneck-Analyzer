@@ -30,6 +30,32 @@ ridge_point = peak_flops / peak_memory_bandwidth
 
 PIM/NMP는 데이터 이동 비용이 큰 workload에서 유리할 수 있습니다. 이 도구는 낮은 arithmetic intensity, 큰 DRAM traffic, irregular memory access pattern을 기준으로 PIM/NMP 적합성을 rule-based heuristic으로 판단합니다.
 
+## PIM/NMP Suitability Score
+
+각 kernel은 0-100점의 PIM/NMP suitability score를 받습니다. 점수는 특정 kernel 이름이 아니라 Roofline 기반 feature를 조합해 계산합니다.
+
+```text
+score =
+  low_arithmetic_intensity_component
+  + dram_traffic_component
+  + bandwidth_pressure_component
+  + irregular_access_component
+```
+
+- Low arithmetic intensity: DRAM에서 데이터를 가져온 뒤 수행하는 연산량이 적을수록 높은 점수
+- DRAM traffic: 읽고 쓰는 전체 DRAM byte가 클수록 높은 점수
+- Bandwidth pressure: peak memory bandwidth 대비 실제 사용 bandwidth가 높을수록 높은 점수
+- Irregular access: random gather, embedding lookup처럼 locality가 낮은 access pattern이면 추가 점수
+
+점수 해석은 다음과 같습니다.
+
+```text
+85-100: strong NMP/PIM candidate
+60-84 : PIM-friendly
+35-59 : possible PIM candidate
+0-34  : low PIM priority
+```
+
 ## Setup
 
 ```bash
