@@ -1,0 +1,17 @@
+kernel_name,runtime_ms,flops,dram_read_bytes,dram_write_bytes,memory_access_pattern,notes
+VA,1.00,100000000,240000000,80000000,regular,PrIM proxy for vector addition; streaming low-intensity memory traffic
+GEMV,1.80,2000000000,1300000000,8000000,regular,PrIM proxy for matrix-vector multiplication with moderate reuse
+SpMV,3.20,350000000,2200000000,120000000,irregular,PrIM proxy for sparse matrix-vector multiplication with indirect access
+SEL,2.60,120000000,1800000000,400000000,regular,PrIM proxy for database select scan with simple predicates
+UNI,3.20,180000000,2100000000,600000000,irregular,PrIM proxy for unique/deduplication with comparison-heavy data movement
+BS,2.80,140000000,1700000000,120000000,irregular,PrIM proxy for binary search with low locality
+TS,2.10,250000000,1400000000,300000000,regular,PrIM proxy for time-series analytics over large arrays
+BFS,4.00,160000000,2600000000,300000000,irregular,PrIM proxy for graph BFS traversal with irregular access
+MLP,3.50,8000000000,1600000000,120000000,regular,PrIM proxy for memory-sensitive MLP inference layer
+NW,3.00,2500000000,1500000000,300000000,regular,PrIM proxy for Needleman-Wunsch dynamic-programming updates
+HST-S,1.90,100000000,1300000000,300000000,regular,PrIM proxy for small-bin histogram
+HST-L,3.20,100000000,2000000000,700000000,irregular,PrIM proxy for large-bin histogram with larger footprint
+RED,0.90,80000000,640000000,4000000,regular,PrIM proxy for reduction
+SCAN-SSA,1.70,160000000,1000000000,400000000,regular,PrIM proxy for scan SSA variant
+SCAN-RSS,1.90,180000000,1100000000,450000000,regular,PrIM proxy for scan RSS variant
+TRNS,4.00,120000000,1600000000,1600000000,regular,PrIM proxy for transpose

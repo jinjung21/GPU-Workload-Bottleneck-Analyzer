@@ -1,0 +1,17 @@
+benchmark,aliases,domain,paper_memory_bound,expected_pim_priority,expected_min_score,paper_notes
+VA,vector_add|vector-add|vector addition,Dense linear algebra,True,medium,45,Vector addition is a streaming memory-bound primitive in PrIM.
+GEMV,gemv|matrix_vector|matrix-vector,Dense linear algebra,True,medium,45,Matrix-vector multiplication has lower data reuse than matrix-matrix multiplication.
+SpMV,spmv|sparse_matrix_vector|sparse-matrix-vector,Sparse linear algebra,True,high,65,Sparse matrix-vector multiplication combines low reuse with indirect memory access.
+SEL,select|selection,Databases,True,high,60,Select scans data and applies simple predicates.
+UNI,unique|dedup|deduplication,Databases,True,high,60,Unique is data-movement-heavy and comparison-oriented.
+BS,binary_search|binary-search,Analytics,True,high,60,Binary search has irregular access and low arithmetic work per memory access.
+TS,time_series|time-series,Analytics,True,medium,50,Time-series analytics uses simple operations over large arrays.
+BFS,bfs|breadth_first_search|breadth-first-search,Graph processing,True,high,70,BFS is graph traversal with irregular memory access and low arithmetic intensity.
+MLP,mlp|multi_layer_perceptron|multi-layer-perceptron,Neural networks,True,medium,45,MLP appears in PrIM as a memory-bound neural-network workload on the evaluated baseline.
+NW,needleman_wunsch|needleman-wunsch,Bioinformatics,True,medium,45,Needleman-Wunsch performs dynamic-programming updates with significant memory movement.
+HST-S,hst_s|histogram_small|histogram-small,Image processing,True,medium,50,Small-bin histogram performs simple updates over image-like input data.
+HST-L,hst_l|histogram_large|histogram-large,Image processing,True,high,60,Large-bin histogram increases memory footprint and update pressure.
+RED,reduction|reduce,Parallel primitives,True,medium,50,Reduction is a bandwidth-sensitive parallel primitive.
+SCAN-SSA,scan_ssa|scan-ssa|prefix_sum_ssa,Parallel primitives,True,medium,50,Scan variant from PrIM with synchronization and streaming memory behavior.
+SCAN-RSS,scan_rss|scan-rss|prefix_sum_rss,Parallel primitives,True,medium,50,Scan variant from PrIM with reduction/scan phases.
+TRNS,transpose|matrix_transpose|matrix-transpose,Parallel primitives,True,medium,50,Transpose stresses memory movement and access layout.

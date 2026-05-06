@@ -56,6 +56,29 @@ score =
 0-34  : low PIM priority
 ```
 
+## Paper Baseline Alignment
+
+PrIM 2022 benchmark suite는 UPMEM 기반 real-world PIM architecture를 평가하기 위해 제안된 16개 memory-bound workload 모음입니다. 이 프로젝트는 PrIM workload metadata를 `paper_baselines/prim2022_workloads.csv`에 저장하고, analyzer 결과가 논문 benchmark expectation과 얼마나 맞는지 비교합니다.
+
+현재 비교는 실제 PIM speedup 재현이 아닙니다. 아직 UPMEM hardware나 GPU profiling 결과가 없기 때문에, 지금 단계에서는 다음을 검증합니다.
+
+```text
+PrIM이 PIM benchmark로 선정한 workload
+vs.
+우리 모델이 높은 PIM/NMP score를 주는 workload
+```
+
+PrIM proxy profile로 baseline alignment report를 생성하려면 다음 명령을 사용합니다.
+
+```bash
+python main.py \
+  --input data/prim2022_proxy_profile.csv \
+  --paper-baseline paper_baselines/prim2022_workloads.csv \
+  --output-dir outputs/prim2022_proxy
+```
+
+`data/prim2022_proxy_profile.csv`는 논문 수치를 복사한 measured profile이 아니라, PrIM workload category를 현재 Roofline analyzer에 통과시키기 위한 qualitative proxy input입니다. 실제 GPU 서버를 사용할 수 있게 되면 이 파일은 Nsight Compute로 측정한 CSV로 대체해야 합니다.
+
 ## Setup
 
 ```bash

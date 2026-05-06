@@ -43,6 +43,7 @@ def save_markdown_report(
     hardware: HardwareConfig,
     figure_path: str | Path,
     output_path: str | Path,
+    baseline_comparison: pd.DataFrame | None = None,
 ) -> None:
     """Write a markdown analysis report."""
 
@@ -51,6 +52,7 @@ def save_markdown_report(
     figure = Path(figure_path)
     figure_link = _relative_link(figure, output.parent)
     summary = build_summary_table(profile)
+    baseline_section = _build_baseline_section(baseline_comparison)
     exceeded = profile[profile["exceeds_roofline"]]
     warnings = []
     if not exceeded.empty:
@@ -83,14 +85,46 @@ def save_markdown_report(
         "",
         summary.to_markdown(index=False),
         "",
+        *baseline_section,
         "## Notes",
         "",
         "- This report uses fake profiling data and does not require CUDA or NVIDIA tools.",
         "- PIM/NMP suitability is a rule-based heuristic for early-stage research prototyping.",
         "- The parser is intentionally separated so Nsight Compute CSV support can be added later.",
+        "- Paper baseline comparison checks workload-category alignment, not measured PIM speedup.",
         "",
     ]
     output.write_text("\n".join(report), encoding="utf-8")
+
+
+def _build_baseline_section(baseline_comparison: pd.DataFrame | None) -> list[str]:
+    if baseline_comparison is None:
+        return []
+
+    profiled = baseline_comparison[baseline_comparison["model_alignment"] != "not profiled"]
+    matches = profiled[profiled["model_alignment"] == "match"]
+    match_rate = 0.0 if len(profiled) == 0 else len(matches) / len(profiled)
+    table_columns = [
+        "benchmark",
+        "domain",
+        "paper_expected",
+        "expected_min_score",
+        "our_kernel",
+        "our_pim_label",
+        "our_score",
+        "model_alignment",
+    ]
+
+    return [
+        "## Paper Baseline Comparison",
+        "",
+        "- Baseline: PrIM 2022 workload suite for real-world UPMEM PIM characterization.",
+        f"- Coverage: {len(profiled)}/{len(baseline_comparison)} paper workloads profiled in this run.",
+        f"- Alignment: {len(matches)}/{len(profiled)} matched expected score floors ({match_rate:.1%}).",
+        "",
+        baseline_comparison[table_columns].to_markdown(index=False),
+        "",
+    ]
 
 
 def _relative_link(target: Path, base_dir: Path) -> str:
