@@ -10,8 +10,13 @@ BASELINE_REQUIRED_COLUMNS = {
     "aliases",
     "domain",
     "paper_memory_bound",
+    "expected_pim_candidate",
     "expected_pim_priority",
     "expected_min_score",
+    "operation_complexity",
+    "communication_intensity",
+    "partitionability",
+    "host_transfer_sensitivity",
     "paper_notes",
 }
 
@@ -31,6 +36,7 @@ def load_paper_baseline_csv(path: str | Path) -> pd.DataFrame:
 
     baseline["expected_min_score"] = pd.to_numeric(baseline["expected_min_score"], errors="raise")
     baseline["paper_memory_bound"] = baseline["paper_memory_bound"].map(_parse_bool)
+    baseline["expected_pim_candidate"] = baseline["expected_pim_candidate"].map(_parse_bool)
     return baseline
 
 
@@ -52,18 +58,26 @@ def compare_to_paper_baseline(profile: pd.DataFrame, baseline: pd.DataFrame) -> 
 
         score = int(matched["pim_nmp_score"])
         expected_min = int(expected["expected_min_score"])
-        model_alignment = "match" if score >= expected_min else "miss"
+        expected_candidate = bool(expected["expected_pim_candidate"])
+        predicted_candidate = score >= expected_min if expected_candidate else score >= 60
+        model_alignment = "match" if predicted_candidate == expected_candidate else "miss"
         rows.append(
             {
                 "paper": "PrIM 2022",
                 "benchmark": expected["benchmark"],
                 "domain": expected["domain"],
+                "expected_candidate": expected_candidate,
                 "paper_expected": expected["expected_pim_priority"],
                 "expected_min_score": expected_min,
+                "operation_complexity": expected["operation_complexity"],
+                "communication_intensity": expected["communication_intensity"],
+                "partitionability": expected["partitionability"],
+                "host_transfer_sensitivity": expected["host_transfer_sensitivity"],
                 "our_kernel": matched["kernel_name"],
                 "our_bottleneck": matched["bottleneck_classification"],
                 "our_pim_label": matched["pim_nmp_suitability"],
                 "our_score": score,
+                "heuristic_candidate": score >= 60,
                 "model_alignment": model_alignment,
                 "paper_notes": expected["paper_notes"],
             }
@@ -98,12 +112,18 @@ def _missing_row(expected: pd.Series) -> dict[str, object]:
         "paper": "PrIM 2022",
         "benchmark": expected["benchmark"],
         "domain": expected["domain"],
+        "expected_candidate": bool(expected["expected_pim_candidate"]),
         "paper_expected": expected["expected_pim_priority"],
         "expected_min_score": int(expected["expected_min_score"]),
+        "operation_complexity": expected["operation_complexity"],
+        "communication_intensity": expected["communication_intensity"],
+        "partitionability": expected["partitionability"],
+        "host_transfer_sensitivity": expected["host_transfer_sensitivity"],
         "our_kernel": "",
         "our_bottleneck": "",
         "our_pim_label": "",
         "our_score": "",
+        "heuristic_candidate": "",
         "model_alignment": "not profiled",
         "paper_notes": expected["paper_notes"],
     }

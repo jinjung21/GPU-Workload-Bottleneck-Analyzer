@@ -1,17 +1,21 @@
-benchmark,aliases,domain,paper_memory_bound,expected_pim_priority,expected_min_score,paper_notes
-VA,vector_add|vector-add|vector addition,Dense linear algebra,True,medium,45,Vector addition is a streaming memory-bound primitive in PrIM.
-GEMV,gemv|matrix_vector|matrix-vector,Dense linear algebra,True,medium,45,Matrix-vector multiplication has lower data reuse than matrix-matrix multiplication.
-SpMV,spmv|sparse_matrix_vector|sparse-matrix-vector,Sparse linear algebra,True,high,65,Sparse matrix-vector multiplication combines low reuse with indirect memory access.
-SEL,select|selection,Databases,True,high,60,Select scans data and applies simple predicates.
-UNI,unique|dedup|deduplication,Databases,True,high,60,Unique is data-movement-heavy and comparison-oriented.
-BS,binary_search|binary-search,Analytics,True,high,60,Binary search has irregular access and low arithmetic work per memory access.
-TS,time_series|time-series,Analytics,True,medium,50,Time-series analytics uses simple operations over large arrays.
-BFS,bfs|breadth_first_search|breadth-first-search,Graph processing,True,high,70,BFS is graph traversal with irregular memory access and low arithmetic intensity.
-MLP,mlp|multi_layer_perceptron|multi-layer-perceptron,Neural networks,True,medium,45,MLP appears in PrIM as a memory-bound neural-network workload on the evaluated baseline.
-NW,needleman_wunsch|needleman-wunsch,Bioinformatics,True,medium,45,Needleman-Wunsch performs dynamic-programming updates with significant memory movement.
-HST-S,hst_s|histogram_small|histogram-small,Image processing,True,medium,50,Small-bin histogram performs simple updates over image-like input data.
-HST-L,hst_l|histogram_large|histogram-large,Image processing,True,high,60,Large-bin histogram increases memory footprint and update pressure.
-RED,reduction|reduce,Parallel primitives,True,medium,50,Reduction is a bandwidth-sensitive parallel primitive.
-SCAN-SSA,scan_ssa|scan-ssa|prefix_sum_ssa,Parallel primitives,True,medium,50,Scan variant from PrIM with synchronization and streaming memory behavior.
-SCAN-RSS,scan_rss|scan-rss|prefix_sum_rss,Parallel primitives,True,medium,50,Scan variant from PrIM with reduction/scan phases.
-TRNS,transpose|matrix_transpose|matrix-transpose,Parallel primitives,True,medium,50,Transpose stresses memory movement and access layout.
+benchmark,aliases,domain,paper_memory_bound,expected_pim_candidate,expected_pim_priority,expected_min_score,operation_complexity,communication_intensity,partitionability,host_transfer_sensitivity,paper_notes
+VA,vector_add|vector-add|vector addition,Dense linear algebra,True,True,medium,45,low,low,high,low,Vector addition is a streaming memory-bound primitive in PrIM.
+GEMV,gemv|matrix_vector|matrix-vector,Dense linear algebra,True,True,medium,45,medium,low,high,medium,Matrix-vector multiplication has lower data reuse than matrix-matrix multiplication.
+SpMV,spmv|sparse_matrix_vector|sparse-matrix-vector,Sparse linear algebra,True,True,high,65,low,medium,medium,medium,Sparse matrix-vector multiplication combines low reuse with indirect memory access.
+SEL,select|selection,Databases,True,True,high,60,low,low,high,low,Select scans data and applies simple predicates.
+UNI,unique|dedup|deduplication,Databases,True,True,high,60,low,medium,medium,medium,Unique is data-movement-heavy and comparison-oriented.
+BS,binary_search|binary-search,Analytics,True,True,high,60,low,medium,medium,medium,Binary search has irregular access and low arithmetic work per memory access.
+TS,time_series|time-series,Analytics,True,True,medium,50,low,low,high,low,Time-series analytics uses simple operations over large arrays.
+BFS,bfs|breadth_first_search|breadth-first-search,Graph processing,True,True,high,70,low,high,medium,medium,BFS is graph traversal with irregular memory access and low arithmetic intensity.
+MLP,mlp|multi_layer_perceptron|multi-layer-perceptron,Neural networks,True,True,medium,45,medium,low,high,medium,MLP appears in PrIM as a memory-bound neural-network workload on the evaluated baseline.
+NW,needleman_wunsch|needleman-wunsch,Bioinformatics,True,True,medium,45,medium,medium,medium,medium,Needleman-Wunsch performs dynamic-programming updates with significant memory movement.
+HST-S,hst_s|histogram_small|histogram-small,Image processing,True,True,medium,50,low,medium,medium,low,Small-bin histogram performs simple updates over image-like input data.
+HST-L,hst_l|histogram_large|histogram-large,Image processing,True,True,high,60,low,high,medium,medium,Large-bin histogram increases memory footprint and update pressure.
+RED,reduction|reduce,Parallel primitives,True,True,medium,50,low,medium,high,low,Reduction is a bandwidth-sensitive parallel primitive.
+SCAN-SSA,scan_ssa|scan-ssa|prefix_sum_ssa,Parallel primitives,True,True,medium,50,low,medium,high,low,Scan variant from PrIM with synchronization and streaming memory behavior.
+SCAN-RSS,scan_rss|scan-rss|prefix_sum_rss,Parallel primitives,True,True,medium,50,low,medium,high,low,Scan variant from PrIM with reduction/scan phases.
+TRNS,transpose|matrix_transpose|matrix-transpose,Parallel primitives,True,True,medium,50,low,low,high,low,Transpose stresses memory movement and access layout.
+GEMM-TILED,matrix_mul_tiled|tiled_gemm|gemm_tiled,Dense linear algebra,False,False,low,0,high,low,high,medium,Compute-heavy tiled GEMM is a negative control because data reuse is high and arithmetic intensity is high.
+CONV2D,conv2d|convolution,DNN kernels,False,False,low,0,high,medium,high,medium,Convolution is usually better served by GPU tensor/compute throughput than simple near-memory execution.
+FFT,fft|fast_fourier_transform,Signal processing,False,False,low,0,high,high,medium,medium,FFT has substantial arithmetic and communication structure that weakens simple PIM offloading.
+SORT,sort|radix_sort|comparison_sort,Analytics,False,False,low,0,medium,high,medium,high,Sorting is a negative control because communication and data rearrangement overhead can dominate.

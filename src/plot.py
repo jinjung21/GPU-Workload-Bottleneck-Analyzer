@@ -64,6 +64,48 @@ def save_roofline_plot(profile: pd.DataFrame, hardware: HardwareConfig, output_p
     plt.close(fig)
 
 
+def save_model_comparison_plot(
+    model_metrics: pd.DataFrame,
+    model_comparison: pd.DataFrame,
+    output_path: str | Path,
+) -> None:
+    """Save a compact plot for model quality and analytical speedup estimates."""
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    metrics = model_metrics.copy().sort_values("f1", ascending=False)
+    speedups = model_comparison[model_comparison["model"] == "analytical_v2"].copy()
+    speedups["estimated_speedup"] = pd.to_numeric(speedups["estimated_speedup"], errors="coerce")
+    speedups = speedups.sort_values("estimated_speedup", ascending=True)
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    x = range(len(metrics))
+    width = 0.24
+    axes[0].bar([value - width for value in x], metrics["precision"], width=width, label="Precision", color="#2ca02c")
+    axes[0].bar(x, metrics["recall"], width=width, label="Recall", color="#1f77b4")
+    axes[0].bar([value + width for value in x], metrics["f1"], width=width, label="F1", color="#d62728")
+    axes[0].set_xticks(list(x))
+    axes[0].set_xticklabels(metrics["model"], rotation=20, ha="right")
+    axes[0].set_ylim(0, 1.08)
+    axes[0].set_title("Candidate Selection Quality")
+    axes[0].set_ylabel("Score")
+    axes[0].grid(axis="y", linestyle=":", linewidth=0.6)
+    axes[0].legend()
+
+    colors = ["#2ca02c" if candidate else "#7f7f7f" for candidate in speedups["predicted_candidate"]]
+    axes[1].barh(speedups["benchmark"], speedups["estimated_speedup"], color=colors)
+    axes[1].axvline(1.0, color="#444444", linestyle="--", linewidth=1.0)
+    axes[1].set_title("Analytical PIM/NMP Speedup Estimate")
+    axes[1].set_xlabel("Estimated speedup vs GPU proxy runtime")
+    axes[1].grid(axis="x", linestyle=":", linewidth=0.6)
+
+    fig.tight_layout()
+    fig.savefig(output, dpi=180)
+    plt.close(fig)
+
+
 def _logspace(start: float, stop: float, points: int) -> list[float]:
     """Small helper to avoid adding NumPy as a direct dependency."""
 

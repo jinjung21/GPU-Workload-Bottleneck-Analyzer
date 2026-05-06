@@ -8,8 +8,9 @@ from src.baseline import (
 )
 from src.classifier import add_classifications
 from src.config import DEFAULT_HARDWARE, HardwareConfig
+from src.model_comparison import build_model_comparison
 from src.parser import load_profile_csv
-from src.plot import save_roofline_plot
+from src.plot import save_model_comparison_plot, save_roofline_plot
 from src.report import build_summary_table, save_markdown_report
 from src.roofline import add_roofline_metrics
 
@@ -28,6 +29,7 @@ def main() -> None:
         peak_memory_bandwidth=args.peak_memory_bandwidth,
     )
     figure_path = args.output_dir / "figures" / "roofline.png"
+    model_figure_path = args.output_dir / "figures" / "model_comparison.png"
     report_path = args.output_dir / "reports" / "analysis_report.md"
 
     profile = load_profile_csv(args.input)
@@ -35,12 +37,26 @@ def main() -> None:
     profile = add_classifications(profile, hardware)
 
     baseline_comparison = None
+    model_comparison = None
+    model_metrics = None
     if args.paper_baseline:
         baseline = load_paper_baseline_csv(args.paper_baseline)
         baseline_comparison = compare_to_paper_baseline(profile, baseline)
+        model_comparison, model_metrics = build_model_comparison(profile, baseline, hardware)
 
     save_roofline_plot(profile, hardware, figure_path)
-    save_markdown_report(profile, hardware, figure_path, report_path, baseline_comparison)
+    if model_comparison is not None and model_metrics is not None:
+        save_model_comparison_plot(model_metrics, model_comparison, model_figure_path)
+    save_markdown_report(
+        profile,
+        hardware,
+        figure_path,
+        report_path,
+        baseline_comparison,
+        model_comparison,
+        model_metrics,
+        model_figure_path if model_comparison is not None else None,
+    )
 
     print("\nGPU Workload Bottleneck Analyzer")
     print("=" * 34)
@@ -59,6 +75,11 @@ def main() -> None:
             f"matches: {alignment['matches']}, "
             f"match rate: {alignment['match_rate']:.1%}"
         )
+    if model_metrics is not None:
+        print()
+        print("Model comparison")
+        print("-" * 16)
+        print(model_metrics.to_string(index=False, formatters=_metric_formatters()))
     print()
     print(f"Saved roofline plot: {figure_path}")
     print(f"Saved report: {report_path}")
@@ -83,6 +104,15 @@ def parse_args() -> argparse.Namespace:
         help=f"Optional paper workload baseline CSV. Example: {PRIM_BASELINE_PATH}",
     )
     return parser.parse_args()
+
+
+def _metric_formatters() -> dict[str, object]:
+    return {
+        "precision": lambda value: f"{value:.2f}",
+        "recall": lambda value: f"{value:.2f}",
+        "f1": lambda value: f"{value:.2f}",
+        "accuracy": lambda value: f"{value:.2f}",
+    }
 
 
 if __name__ == "__main__":

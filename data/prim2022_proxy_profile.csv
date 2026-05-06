@@ -15,3 +15,7 @@ RED,0.90,80000000,640000000,4000000,regular,PrIM proxy for reduction
 SCAN-SSA,1.70,160000000,1000000000,400000000,regular,PrIM proxy for scan SSA variant
 SCAN-RSS,1.90,180000000,1100000000,450000000,regular,PrIM proxy for scan RSS variant
 TRNS,4.00,120000000,1600000000,1600000000,regular,PrIM proxy for transpose
+GEMM-TILED,12.00,120000000000,750000000,16000000,regular,Negative control for compute-heavy tiled GEMM
+CONV2D,8.00,90000000000,1000000000,200000000,regular,Negative control for compute-heavy convolution
+FFT,5.50,35000000000,900000000,300000000,regular,Negative control for arithmetic and communication-heavy FFT
+SORT,7.00,3000000000,2200000000,1800000000,irregular,Negative control for communication-heavy sorting

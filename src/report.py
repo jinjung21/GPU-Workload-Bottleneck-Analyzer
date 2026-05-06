@@ -44,6 +44,9 @@ def save_markdown_report(
     figure_path: str | Path,
     output_path: str | Path,
     baseline_comparison: pd.DataFrame | None = None,
+    model_comparison: pd.DataFrame | None = None,
+    model_metrics: pd.DataFrame | None = None,
+    model_figure_path: str | Path | None = None,
 ) -> None:
     """Write a markdown analysis report."""
 
@@ -53,6 +56,7 @@ def save_markdown_report(
     figure_link = _relative_link(figure, output.parent)
     summary = build_summary_table(profile)
     baseline_section = _build_baseline_section(baseline_comparison)
+    model_section = _build_model_comparison_section(model_comparison, model_metrics, model_figure_path, output.parent)
     exceeded = profile[profile["exceeds_roofline"]]
     warnings = []
     if not exceeded.empty:
@@ -86,12 +90,14 @@ def save_markdown_report(
         summary.to_markdown(index=False),
         "",
         *baseline_section,
+        *model_section,
         "## Notes",
         "",
         "- This report uses fake profiling data and does not require CUDA or NVIDIA tools.",
         "- PIM/NMP suitability is a rule-based heuristic for early-stage research prototyping.",
         "- The parser is intentionally separated so Nsight Compute CSV support can be added later.",
         "- Paper baseline comparison checks workload-category alignment, not measured PIM speedup.",
+        "- Analytical PIM estimates are sensitivity-model outputs, not hardware measurements.",
         "",
     ]
     output.write_text("\n".join(report), encoding="utf-8")
@@ -118,11 +124,56 @@ def _build_baseline_section(baseline_comparison: pd.DataFrame | None) -> list[st
     return [
         "## Paper Baseline Comparison",
         "",
-        "- Baseline: PrIM 2022 workload suite for real-world UPMEM PIM characterization.",
+        "- Baseline: PrIM 2022 workload suite plus compute/communication-heavy negative controls.",
         f"- Coverage: {len(profiled)}/{len(baseline_comparison)} paper workloads profiled in this run.",
         f"- Alignment: {len(matches)}/{len(profiled)} matched expected score floors ({match_rate:.1%}).",
         "",
         baseline_comparison[table_columns].to_markdown(index=False),
+        "",
+    ]
+
+
+def _build_model_comparison_section(
+    model_comparison: pd.DataFrame | None,
+    model_metrics: pd.DataFrame | None,
+    model_figure_path: str | Path | None,
+    report_dir: Path,
+) -> list[str]:
+    if model_comparison is None or model_metrics is None:
+        return []
+
+    speedup = model_comparison[model_comparison["model"] == "analytical_v2"].copy()
+    speedup = speedup.sort_values("estimated_speedup", ascending=False)
+    speedup_columns = [
+        "benchmark",
+        "target_candidate",
+        "predicted_candidate",
+        "estimated_speedup",
+        "estimated_pim_time_ms",
+        "risk",
+    ]
+    metric_table = model_metrics.copy()
+    for column in ["precision", "recall", "f1", "accuracy"]:
+        metric_table[column] = metric_table[column].map(lambda value: f"{value:.2f}")
+    speedup["estimated_speedup"] = speedup["estimated_speedup"].map(lambda value: f"{value:.2f}x")
+    speedup["estimated_pim_time_ms"] = speedup["estimated_pim_time_ms"].map(lambda value: f"{value:.3f}")
+
+    figure_lines = []
+    if model_figure_path is not None:
+        figure_link = _relative_link(Path(model_figure_path), report_dir)
+        figure_lines = ["", f"![Model Comparison]({figure_link})", ""]
+
+    return [
+        "## Model Comparison",
+        "",
+        "The table compares simple baselines against the analytical PIM/NMP model using literature-labeled proxy workloads.",
+        *figure_lines,
+        "",
+        metric_table.to_markdown(index=False),
+        "",
+        "### Analytical PIM/NMP Estimates",
+        "",
+        speedup[speedup_columns].to_markdown(index=False),
         "",
     ]
 
