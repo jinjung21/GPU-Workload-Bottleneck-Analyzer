@@ -4,3 +4,8 @@ __pycache__/
 *.py[cod]
 outputs/
 .DS_Store
+build/
+profiles/*.csv
+profiles/*.log
+profiles/*.qdrep
+profiles/*.sqlite

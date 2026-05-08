@@ -143,6 +143,45 @@ python main.py \
 python -m pytest
 ```
 
+## CUDA Benchmark Profiling
+
+GPU 서버에서는 CUDA benchmark를 빌드하고 실제 GPU runtime 기반 CSV를 생성할 수 있습니다. 서버의 CUDA 11.0 toolkit은 GCC 9와 맞춰야 하므로, script는 기본적으로 `/usr/local/cuda/bin/nvcc`와 `/usr/bin/g++-9`를 사용합니다.
+
+```bash
+bash scripts/build_benchmarks.sh
+bash scripts/profile_nvprof.sh
+```
+
+현재 benchmark suite는 세 개의 기준 workload로 시작합니다.
+
+```text
+vector_add        : streaming memory-bound
+random_gather     : irregular memory-bound
+matrix_mul_tiled  : compute-bound
+```
+
+`scripts/profile_nvprof.sh`는 다음을 생성합니다.
+
+```text
+profiles/gpu_profile.csv
+profiles/vector_add_nvprof.log
+profiles/random_gather_nvprof.log
+profiles/matrix_mul_tiled_nvprof.log
+```
+
+생성된 CSV는 바로 analyzer 입력으로 사용할 수 있습니다.
+
+```bash
+python3 main.py \
+  --input profiles/gpu_profile.csv \
+  --output-dir outputs/gpu_profile_rtx2080ti \
+  --hardware-name "RTX 2080 Ti" \
+  --peak-flops 13450000000000 \
+  --peak-memory-bandwidth 616000000000
+```
+
+이 profiling path는 Nsight Compute performance counter 권한이 없는 서버에서도 동작하도록 설계되었습니다. CUDA event로 runtime을 측정하고, benchmark 코드에서 theoretical FLOPs/DRAM bytes를 함께 기록합니다. `nvprof` log는 raw profiler evidence로 저장됩니다.
+
 ## Outputs
 
 실행 후 다음 파일이 생성됩니다.
@@ -166,10 +205,10 @@ notes
 
 ## Current Limitations
 
-- 실제 CUDA kernel 실행은 하지 않습니다.
-- NVIDIA GPU profiling 도구를 사용하지 않습니다.
+- Nsight Compute performance counter 기반 metric은 아직 사용하지 않습니다.
 - PIM/NMP 판단은 논문 기반 정량 모델이 아니라 초기 rule-based heuristic입니다.
 - Roofline을 초과하는 측정값은 단위 오류 또는 hardware config 오류 가능성이 있으므로 report에 별도 표시합니다.
+- 현재 CUDA benchmark의 FLOPs/DRAM bytes는 benchmark 구조에서 계산한 theoretical count입니다.
 
 ## Future Work
 
