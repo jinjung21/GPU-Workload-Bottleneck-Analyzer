@@ -2,11 +2,14 @@
 
 Roofline 모델을 기반으로 GPU kernel profiling 데이터를 분석해 memory-bound, compute-bound, underutilized/latency-bound 병목을 분류하고, PIM/NMP에 적합한 workload 후보를 찾는 Python 기반 연구용 프로토타입입니다.
 
-현재 버전은 macOS에서 실행 가능하도록 fake profiling CSV만 사용합니다. CUDA, Nsight Compute, NVIDIA GPU는 필요하지 않습니다.
+현재 버전은 두 가지 입력 경로를 지원합니다.
+
+- Proxy/profile CSV 분석: CUDA 없이 macOS나 일반 Linux 환경에서 분석 모델과 report pipeline을 검증합니다.
+- CUDA benchmark profiling: RTX 2080 Ti 서버에서 CUDA benchmark를 실행하고 실제 GPU runtime 기반 CSV를 생성합니다.
 
 ## Project Goal
 
-이 프로젝트의 목적은 실제 GPU profiler가 없는 환경에서도 GPU workload 병목 분석 파이프라인을 먼저 설계하고 구현하는 것입니다. 나중에 Linux GPU 서버를 사용할 수 있게 되면 Nsight Compute CSV를 입력으로 받아 같은 분석 엔진을 재사용하도록 확장할 수 있습니다.
+이 프로젝트의 목적은 GPU workload의 병목을 정량화하고, PIM/NMP offloading 후보를 여러 baseline model과 비교 가능한 방식으로 선별하는 것입니다. 현재는 Roofline metric, PrIM-inspired proxy baseline, CUDA event runtime, `nvprof` log를 조합해 초기 end-to-end pipeline을 구성했습니다. 향후 Nsight Compute counter 권한이 확보되면 cache hit rate, occupancy, warp divergence, memory transaction metric까지 feature로 확장할 예정입니다.
 
 ## Roofline Model
 
@@ -60,7 +63,7 @@ score =
 
 PrIM 2022 benchmark suite는 UPMEM 기반 real-world PIM architecture를 평가하기 위해 제안된 16개 memory-bound workload 모음입니다. 이 프로젝트는 PrIM workload metadata와 compute/communication-heavy negative control workload를 `paper_baselines/prim2022_workloads.csv`에 저장하고, 여러 후보 선별 모델을 비교합니다.
 
-현재 비교는 실제 PIM speedup 재현이 아닙니다. 아직 UPMEM hardware나 GPU profiling 결과가 없기 때문에, 지금 단계에서는 literature-labeled proxy workload를 사용해 다음을 검증합니다.
+현재 비교는 실제 PIM speedup 재현이 아닙니다. UPMEM hardware가 없기 때문에, 지금 단계에서는 literature-labeled proxy workload를 사용해 다음을 검증합니다.
 
 ```text
 PrIM이 PIM benchmark로 선정한 positive workload
@@ -114,7 +117,44 @@ python main.py \
   --output-dir outputs/prim2022_model_v3
 ```
 
-`data/prim2022_proxy_profile.csv`는 논문 수치를 복사한 measured profile이 아니라, PrIM workload category와 negative control workload를 현재 analyzer에 통과시키기 위한 qualitative proxy input입니다. 실제 GPU 서버를 사용할 수 있게 되면 이 파일은 Nsight Compute로 측정한 CSV로 대체해야 합니다.
+`data/prim2022_proxy_profile.csv`는 논문 수치를 복사한 measured profile이 아니라, PrIM workload category와 negative control workload를 현재 analyzer에 통과시키기 위한 qualitative proxy input입니다. 향후 Nsight Compute performance counter 권한이 확보되면 이 파일은 measured counter 기반 CSV로 대체해야 합니다.
+
+## Current GPU Server Status
+
+현재 확인한 GPU 서버 환경은 다음과 같습니다.
+
+```text
+OS: Ubuntu 20.04
+GPU: NVIDIA GeForce RTX 2080 Ti
+Driver: 535.230.02
+CUDA runtime reported by driver: 12.2
+CUDA toolkit: 11.0
+Nsight Compute: 2020.1.1
+Nsight Systems: 2020.3.2
+Host compiler for nvcc: /usr/bin/g++-9
+```
+
+Nsight Compute는 설치되어 있지만 일반 사용자 계정에서는 performance counter 권한이 막혀 있습니다.
+
+```text
+ERR_NVGPUCTRPERM
+```
+
+따라서 현재 실제 GPU profiling path는 다음처럼 구성했습니다.
+
+```text
+CUDA event runtime + theoretical FLOPs/bytes + nvprof raw log
+```
+
+첫 실제 RTX 2080 Ti run에서는 다음 benchmark가 실행되었습니다.
+
+```text
+vector_add        : memory-bound / bandwidth-bound
+random_gather     : underutilized / latency-bound
+matrix_mul_tiled  : memory-bound / bandwidth-bound in the current implementation
+```
+
+`matrix_mul_tiled`는 compute-bound baseline으로 기대했지만, 현재 구현과 problem size에서는 arithmetic intensity가 RTX 2080 Ti ridge point보다 낮게 나왔습니다. 따라서 다음 단계에서는 cuBLAS SGEMM처럼 더 강한 compute-bound 기준 benchmark를 추가해야 합니다.
 
 ## Setup
 
@@ -156,8 +196,8 @@ bash scripts/profile_nvprof.sh
 
 ```text
 vector_add        : streaming memory-bound
-random_gather     : irregular memory-bound
-matrix_mul_tiled  : compute-bound
+random_gather     : irregular memory / latency-bound
+matrix_mul_tiled  : initial GEMM baseline; not yet a strong compute-bound reference
 ```
 
 `scripts/profile_nvprof.sh`는 다음을 생성합니다.
@@ -206,15 +246,17 @@ notes
 ## Current Limitations
 
 - Nsight Compute performance counter 기반 metric은 아직 사용하지 않습니다.
-- PIM/NMP 판단은 논문 기반 정량 모델이 아니라 초기 rule-based heuristic입니다.
+- `PIM/NMP score`는 아직 calibration 전의 heuristic component를 포함합니다.
+- `feature_cost_v3`는 실제 PIM hardware 측정값이 아니라 analytical opportunity estimate입니다.
 - Roofline을 초과하는 측정값은 단위 오류 또는 hardware config 오류 가능성이 있으므로 report에 별도 표시합니다.
 - 현재 CUDA benchmark의 FLOPs/DRAM bytes는 benchmark 구조에서 계산한 theoretical count입니다.
+- 현재 실제 GPU benchmark는 3개뿐이며, compute-bound 기준점은 cuBLAS SGEMM으로 보강해야 합니다.
 
 ## Future Work
 
-- Nsight Compute CSV parser 추가
-- CUDA benchmark 추가
-- Linux GPU 서버에서 실제 profiling 결과 수집
+- cuBLAS SGEMM benchmark 추가
+- 실제 GPU benchmark metadata 추가 및 `feature_cost_v3` comparison 연결
+- Nsight Compute performance counter 권한 확보 후 CSV parser 추가
 - cache hit rate, memory latency, occupancy, warp divergence metric 반영
-- PIM/NMP 관련 논문 case study와 비교 검증
-- 이력서용 프로젝트로 발전시키려면 synthetic benchmark suite, Nsight Compute parser, 논문 baseline 재현표를 우선 추가
+- PIM/NMP model threshold와 risk parameter를 논문/실측 데이터 기반으로 calibration
+- PrIM/UPMEM case study와 실제 RTX 2080 Ti profiling 결과 비교
