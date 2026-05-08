@@ -78,7 +78,7 @@ heuristic_v1  : 기존 PIM/NMP score가 60점 이상이면 candidate
 analytical_v2 : PIM memory/compute/host-transfer/sync time을 추정하고 risk gate 적용
 ```
 
-`analytical_v2`는 다음 형태의 추정식을 사용합니다.
+`analytical_v2`와 `feature_cost_v3`는 다음 형태의 추정식을 사용합니다.
 
 ```text
 estimated_pim_time =
@@ -90,13 +90,28 @@ estimated_pim_time =
 estimated_speedup = gpu_proxy_runtime / estimated_pim_time
 ```
 
+`feature_cost_v3`는 metadata label만으로 gate를 거는 대신, profile에서 얻은 numeric feature와 임시 paper metadata를 결합해 GPU/PIM cost를 비교합니다.
+
+```text
+memory_pressure
+bandwidth_pressure
+compute_pressure
+irregularity
+operation_complexity
+communication_intensity
+partitionability
+host_transfer_sensitivity
+```
+
+이 모델은 `SORT`처럼 낮은 arithmetic intensity와 irregular access만 보면 좋아 보이지만 communication/host-transfer risk가 큰 workload를 false positive로 분류하지 않도록 설계되었습니다.
+
 PrIM proxy profile로 model comparison report를 생성하려면 다음 명령을 사용합니다.
 
 ```bash
 python main.py \
   --input data/prim2022_proxy_profile.csv \
   --paper-baseline paper_baselines/prim2022_workloads.csv \
-  --output-dir outputs/prim2022_model_v2
+  --output-dir outputs/prim2022_model_v3
 ```
 
 `data/prim2022_proxy_profile.csv`는 논문 수치를 복사한 measured profile이 아니라, PrIM workload category와 negative control workload를 현재 analyzer에 통과시키기 위한 qualitative proxy input입니다. 실제 GPU 서버를 사용할 수 있게 되면 이 파일은 Nsight Compute로 측정한 CSV로 대체해야 합니다.

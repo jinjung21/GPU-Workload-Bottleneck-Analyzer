@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from .config import HardwareConfig
+from .cost_model_v3 import estimate_feature_cost_v3
 
 
 @dataclass(frozen=True)
@@ -41,17 +42,21 @@ def build_model_comparison(
         }
         analytical = estimate_pim_speedup(matched, expected, config)
         predictions["analytical_v2"] = _predict_analytical_candidate(analytical, expected, config)
+        feature_cost = estimate_feature_cost_v3(matched, hardware, expected)
+        predictions["feature_cost_v3"] = bool(feature_cost["predicted_candidate"])
 
         for model_name, predicted in predictions.items():
+            estimate = _model_estimate(model_name, analytical, feature_cost)
             rows.append(
                 {
                     "model": model_name,
                     "benchmark": expected["benchmark"],
                     "target_candidate": target,
                     "predicted_candidate": predicted,
-                    "estimated_speedup": analytical["estimated_speedup"] if model_name == "analytical_v2" else "",
-                    "estimated_pim_time_ms": analytical["estimated_pim_time_ms"] if model_name == "analytical_v2" else "",
-                    "risk": analytical["risk"] if model_name == "analytical_v2" else "",
+                    "estimated_speedup": estimate["estimated_speedup"],
+                    "estimated_pim_time_ms": estimate["estimated_pim_time_ms"],
+                    "risk": estimate["risk"],
+                    "feature_summary": estimate["feature_summary"],
                 }
             )
 
@@ -114,6 +119,33 @@ def evaluate_binary_models(comparison: pd.DataFrame) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows).sort_values(["f1", "precision", "recall"], ascending=False)
+
+
+def _model_estimate(
+    model_name: str,
+    analytical: dict[str, float | str],
+    feature_cost: dict[str, float | str | bool],
+) -> dict[str, object]:
+    if model_name == "analytical_v2":
+        return {
+            "estimated_speedup": analytical["estimated_speedup"],
+            "estimated_pim_time_ms": analytical["estimated_pim_time_ms"],
+            "risk": analytical["risk"],
+            "feature_summary": "",
+        }
+    if model_name == "feature_cost_v3":
+        return {
+            "estimated_speedup": feature_cost["estimated_speedup"],
+            "estimated_pim_time_ms": feature_cost["estimated_pim_time_ms"],
+            "risk": feature_cost["risk"],
+            "feature_summary": feature_cost["feature_summary"],
+        }
+    return {
+        "estimated_speedup": "",
+        "estimated_pim_time_ms": "",
+        "risk": "",
+        "feature_summary": "",
+    }
 
 
 def _predict_ai_only(row: pd.Series, hardware: HardwareConfig) -> bool:

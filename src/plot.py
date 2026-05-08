@@ -75,7 +75,8 @@ def save_model_comparison_plot(
     output.parent.mkdir(parents=True, exist_ok=True)
 
     metrics = model_metrics.copy().sort_values("f1", ascending=False)
-    speedups = model_comparison[model_comparison["model"] == "analytical_v2"].copy()
+    speedup_model = "feature_cost_v3" if "feature_cost_v3" in set(model_comparison["model"]) else "analytical_v2"
+    speedups = model_comparison[model_comparison["model"] == speedup_model].copy()
     speedups["estimated_speedup"] = pd.to_numeric(speedups["estimated_speedup"], errors="coerce")
     speedups = speedups.sort_values("estimated_speedup", ascending=True)
 
@@ -97,7 +98,7 @@ def save_model_comparison_plot(
     colors = ["#2ca02c" if candidate else "#7f7f7f" for candidate in speedups["predicted_candidate"]]
     axes[1].barh(speedups["benchmark"], speedups["estimated_speedup"], color=colors)
     axes[1].axvline(1.0, color="#444444", linestyle="--", linewidth=1.0)
-    axes[1].set_title("Analytical PIM/NMP Speedup Estimate")
+    axes[1].set_title(f"{speedup_model} PIM/NMP Speedup Estimate")
     axes[1].set_xlabel("Estimated speedup vs GPU proxy runtime")
     axes[1].grid(axis="x", linestyle=":", linewidth=0.6)
 

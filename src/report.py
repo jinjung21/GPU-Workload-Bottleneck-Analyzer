@@ -142,7 +142,8 @@ def _build_model_comparison_section(
     if model_comparison is None or model_metrics is None:
         return []
 
-    speedup = model_comparison[model_comparison["model"] == "analytical_v2"].copy()
+    speedup_model = "feature_cost_v3" if "feature_cost_v3" in set(model_comparison["model"]) else "analytical_v2"
+    speedup = model_comparison[model_comparison["model"] == speedup_model].copy()
     speedup = speedup.sort_values("estimated_speedup", ascending=False)
     speedup_columns = [
         "benchmark",
@@ -151,6 +152,7 @@ def _build_model_comparison_section(
         "estimated_speedup",
         "estimated_pim_time_ms",
         "risk",
+        "feature_summary",
     ]
     metric_table = model_metrics.copy()
     for column in ["precision", "recall", "f1", "accuracy"]:
@@ -171,7 +173,7 @@ def _build_model_comparison_section(
         "",
         metric_table.to_markdown(index=False),
         "",
-        "### Analytical PIM/NMP Estimates",
+        f"### {speedup_model} PIM/NMP Estimates",
         "",
         speedup[speedup_columns].to_markdown(index=False),
         "",
