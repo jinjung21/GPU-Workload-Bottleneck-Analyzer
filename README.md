@@ -108,6 +108,8 @@ host_transfer_sensitivity
 
 이 모델은 `SORT`처럼 낮은 arithmetic intensity와 irregular access만 보면 좋아 보이지만 communication/host-transfer risk가 큰 workload를 false positive로 분류하지 않도록 설계되었습니다.
 
+All model assumptions and temporary thresholds are documented in `docs/model_assumptions.md`.
+
 PrIM proxy profile로 model comparison report를 생성하려면 다음 명령을 사용합니다.
 
 ```bash
@@ -198,6 +200,7 @@ bash scripts/profile_nvprof.sh
 vector_add        : streaming memory-bound
 random_gather     : irregular memory / latency-bound
 matrix_mul_tiled  : initial GEMM baseline; not yet a strong compute-bound reference
+cublas_sgemm      : optimized cuBLAS GEMM compute-throughput reference
 ```
 
 `scripts/profile_nvprof.sh`는 다음을 생성합니다.
@@ -207,6 +210,7 @@ profiles/gpu_profile.csv
 profiles/vector_add_nvprof.log
 profiles/random_gather_nvprof.log
 profiles/matrix_mul_tiled_nvprof.log
+profiles/cublas_sgemm_nvprof.log
 ```
 
 생성된 CSV는 바로 analyzer 입력으로 사용할 수 있습니다.
@@ -250,11 +254,10 @@ notes
 - `feature_cost_v3`는 실제 PIM hardware 측정값이 아니라 analytical opportunity estimate입니다.
 - Roofline을 초과하는 측정값은 단위 오류 또는 hardware config 오류 가능성이 있으므로 report에 별도 표시합니다.
 - 현재 CUDA benchmark의 FLOPs/DRAM bytes는 benchmark 구조에서 계산한 theoretical count입니다.
-- 현재 실제 GPU benchmark는 3개뿐이며, compute-bound 기준점은 cuBLAS SGEMM으로 보강해야 합니다.
+- 현재 CUDA benchmark suite는 작으며, 더 다양한 memory access pattern과 problem size sweep이 필요합니다.
 
 ## Future Work
 
-- cuBLAS SGEMM benchmark 추가
 - 실제 GPU benchmark metadata 추가 및 `feature_cost_v3` comparison 연결
 - Nsight Compute performance counter 권한 확보 후 CSV parser 추가
 - cache hit rate, memory latency, occupancy, warp divergence metric 반영

@@ -13,5 +13,6 @@ echo "Using host compiler: $CXXBIN"
 "$NVCC" -O3 -std=c++14 -ccbin "$CXXBIN" benchmarks/vector_add.cu -o build/vector_add
 "$NVCC" -O3 -std=c++14 -ccbin "$CXXBIN" benchmarks/random_gather.cu -o build/random_gather
 "$NVCC" -O3 -std=c++14 -ccbin "$CXXBIN" benchmarks/matrix_mul_tiled.cu -o build/matrix_mul_tiled
+"$NVCC" -O3 -std=c++14 -ccbin "$CXXBIN" benchmarks/cublas_sgemm.cu -lcublas -o build/cublas_sgemm
 
 echo "Built CUDA benchmarks in build/"

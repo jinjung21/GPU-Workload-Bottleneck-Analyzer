@@ -13,14 +13,14 @@ if [[ ! -x "$NVPROF" ]]; then
   exit 1
 fi
 
-if [[ ! -x build/vector_add || ! -x build/random_gather || ! -x build/matrix_mul_tiled ]]; then
+if [[ ! -x build/vector_add || ! -x build/random_gather || ! -x build/matrix_mul_tiled || ! -x build/cublas_sgemm ]]; then
   echo "Benchmarks are missing. Run scripts/build_benchmarks.sh first." >&2
   exit 1
 fi
 
 echo "kernel_name,runtime_ms,flops,dram_read_bytes,dram_write_bytes,memory_access_pattern,notes" > "$OUT_CSV"
 
-for benchmark in vector_add random_gather matrix_mul_tiled; do
+for benchmark in vector_add random_gather matrix_mul_tiled cublas_sgemm; do
   exe="build/$benchmark"
   log="$OUT_DIR/${benchmark}_nvprof.log"
   echo "Profiling $benchmark"
