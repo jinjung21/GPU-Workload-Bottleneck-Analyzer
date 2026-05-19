@@ -37,6 +37,8 @@ def load_paper_baseline_csv(path: str | Path) -> pd.DataFrame:
     baseline["expected_min_score"] = pd.to_numeric(baseline["expected_min_score"], errors="raise")
     baseline["paper_memory_bound"] = baseline["paper_memory_bound"].map(_parse_bool)
     baseline["expected_pim_candidate"] = baseline["expected_pim_candidate"].map(_parse_bool)
+    if "source" not in baseline.columns:
+        baseline["source"] = "PrIM 2022"
     return baseline
 
 
@@ -63,7 +65,7 @@ def compare_to_paper_baseline(profile: pd.DataFrame, baseline: pd.DataFrame) -> 
         model_alignment = "match" if predicted_candidate == expected_candidate else "miss"
         rows.append(
             {
-                "paper": "PrIM 2022",
+                "paper": expected["source"],
                 "benchmark": expected["benchmark"],
                 "domain": expected["domain"],
                 "expected_candidate": expected_candidate,
@@ -109,7 +111,7 @@ def _find_profile_row(profile_by_name: dict[str, pd.Series], benchmark: str, ali
 
 def _missing_row(expected: pd.Series) -> dict[str, object]:
     return {
-        "paper": "PrIM 2022",
+        "paper": expected.get("source", "PrIM 2022"),
         "benchmark": expected["benchmark"],
         "domain": expected["domain"],
         "expected_candidate": bool(expected["expected_pim_candidate"]),

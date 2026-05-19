@@ -218,6 +218,7 @@ profiles/cublas_sgemm_nvprof.log
 ```bash
 python3 main.py \
   --input profiles/gpu_profile.csv \
+  --paper-baseline paper_baselines/gpu_benchmark_metadata.csv \
   --output-dir outputs/gpu_profile_rtx2080ti \
   --hardware-name "RTX 2080 Ti" \
   --peak-flops 13450000000000 \
@@ -225,6 +226,30 @@ python3 main.py \
 ```
 
 이 profiling path는 Nsight Compute performance counter 권한이 없는 서버에서도 동작하도록 설계되었습니다. CUDA event로 runtime을 측정하고, benchmark 코드에서 theoretical FLOPs/DRAM bytes를 함께 기록합니다. `nvprof` log는 raw profiler evidence로 저장됩니다.
+
+## Cache Metrics
+
+Cache behavior is important for distinguishing true DRAM bandwidth bottlenecks from cache locality or latency problems. The current server blocks Nsight Compute performance counters, so the analyzer cannot yet ingest L1/L2 hit rates, memory transactions, occupancy, or warp divergence.
+
+Current handling:
+
+```text
+Available now:
+- arithmetic intensity
+- achieved bandwidth
+- roofline utilization
+- irregular vs regular access metadata
+- CUDA event runtime
+
+Not available yet:
+- L1/L2 cache hit rate
+- DRAM transaction count
+- warp execution efficiency
+- occupancy
+- memory latency counters
+```
+
+When counter access is enabled, these metrics should be added to the feature vector used by `feature_cost_v3`.
 
 ## Outputs
 

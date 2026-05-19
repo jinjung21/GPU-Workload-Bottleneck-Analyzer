@@ -93,9 +93,9 @@ def save_markdown_report(
         *model_section,
         "## Notes",
         "",
-        "- This report uses fake profiling data and does not require CUDA or NVIDIA tools.",
-        "- PIM/NMP suitability is a rule-based heuristic for early-stage research prototyping.",
-        "- The parser is intentionally separated so Nsight Compute CSV support can be added later.",
+        "- Reports can be generated from proxy CSVs or CUDA benchmark profile CSVs.",
+        "- PIM/NMP suitability still includes heuristic components that require calibration.",
+        "- Nsight Compute counter-based parsing can be added when performance counter permissions are available.",
         "- Paper baseline comparison checks workload-category alignment, not measured PIM speedup.",
         "- Analytical PIM estimates are sensitivity-model outputs, not hardware measurements.",
         "",
@@ -110,6 +110,7 @@ def _build_baseline_section(baseline_comparison: pd.DataFrame | None) -> list[st
     profiled = baseline_comparison[baseline_comparison["model_alignment"] != "not profiled"]
     matches = profiled[profiled["model_alignment"] == "match"]
     match_rate = 0.0 if len(profiled) == 0 else len(matches) / len(profiled)
+    sources = ", ".join(sorted(set(baseline_comparison["paper"].astype(str))))
     table_columns = [
         "benchmark",
         "domain",
@@ -124,7 +125,7 @@ def _build_baseline_section(baseline_comparison: pd.DataFrame | None) -> list[st
     return [
         "## Paper Baseline Comparison",
         "",
-        "- Baseline: PrIM 2022 workload suite plus compute/communication-heavy negative controls.",
+        f"- Baseline source: {sources}.",
         f"- Coverage: {len(profiled)}/{len(baseline_comparison)} paper workloads profiled in this run.",
         f"- Alignment: {len(matches)}/{len(profiled)} matched expected score floors ({match_rate:.1%}).",
         "",
