@@ -23,8 +23,9 @@ def save_roofline_plot(profile: pd.DataFrame, hardware: HardwareConfig, output_p
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    min_intensity = max(profile["arithmetic_intensity"].min() / 5, 1e-3)
-    max_intensity = max(profile["arithmetic_intensity"].max() * 5, hardware.ridge_point * 2)
+    plot_intensity = profile["arithmetic_intensity"].clip(lower=1e-6)
+    min_intensity = max(plot_intensity.min() / 5, 1e-6)
+    max_intensity = max(plot_intensity.max() * 5, hardware.ridge_point * 2)
 
     intensities = _logspace(min_intensity, max_intensity, points=200)
     memory_roof = [hardware.peak_memory_bandwidth * intensity for intensity in intensities]
@@ -35,7 +36,7 @@ def save_roofline_plot(profile: pd.DataFrame, hardware: HardwareConfig, output_p
     ax.loglog(intensities, roofline, label="Roofline limit", color="#1f77b4", linewidth=2.5)
     ax.axvline(hardware.ridge_point, color="#666666", linestyle="--", linewidth=1.2, label="Ridge point")
     ax.scatter(
-        profile["arithmetic_intensity"],
+        plot_intensity,
         profile["achieved_flops"],
         s=85,
         color="#d62728",
@@ -48,7 +49,7 @@ def save_roofline_plot(profile: pd.DataFrame, hardware: HardwareConfig, output_p
     for _, row in profile.iterrows():
         ax.annotate(
             row["kernel_name"],
-            (row["arithmetic_intensity"], row["achieved_flops"]),
+            (max(float(row["arithmetic_intensity"]), 1e-6), row["achieved_flops"]),
             xytext=(6, 6),
             textcoords="offset points",
             fontsize=9,

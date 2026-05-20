@@ -79,7 +79,7 @@ def main() -> None:
         print("Paper baseline alignment")
         print("-" * 24)
         print(
-            f"PrIM profiled: {alignment['profiled']}/{alignment['benchmarks']}, "
+            f"Baseline profiled: {alignment['profiled']}/{alignment['benchmarks']}, "
             f"matches: {alignment['matches']}, "
             f"match rate: {alignment['match_rate']:.1%}"
         )

@@ -168,7 +168,7 @@ ERR_NVGPUCTRPERM
 CUDA event runtime + theoretical FLOPs/bytes + nvprof raw log
 ```
 
-첫 실제 RTX 2080 Ti run에서는 다음 benchmark가 실행되었습니다.
+첫 실제 RTX 2080 Ti run에서는 `vector_add`, `random_gather`, `matrix_mul_tiled`, `cublas_sgemm`가 실행되었습니다. 이후 benchmark suite를 확장해 streaming, reduction, transpose, irregular access, dense GEMM 계열을 함께 비교합니다.
 
 ```text
 vector_add        : memory-bound / bandwidth-bound
@@ -176,7 +176,7 @@ random_gather     : underutilized / latency-bound
 matrix_mul_tiled  : memory-bound / bandwidth-bound in the current implementation
 ```
 
-`matrix_mul_tiled`는 compute-bound baseline으로 기대했지만, 현재 구현과 problem size에서는 arithmetic intensity가 RTX 2080 Ti ridge point보다 낮게 나왔습니다. 따라서 다음 단계에서는 cuBLAS SGEMM처럼 더 강한 compute-bound 기준 benchmark를 추가해야 합니다.
+`matrix_mul_tiled`는 compute-bound baseline으로 기대했지만, 현재 구현과 problem size에서는 arithmetic intensity가 RTX 2080 Ti ridge point보다 낮게 나왔습니다. 따라서 cuBLAS SGEMM을 강한 compute-bound 기준 benchmark로 추가했고, `feature_cost_v4`는 high-reuse GEMM 계열을 naive PIM candidate에서 제외합니다.
 
 ## Setup
 
@@ -214,11 +214,14 @@ bash scripts/build_benchmarks.sh
 bash scripts/profile_nvprof.sh
 ```
 
-현재 benchmark suite는 세 개의 기준 workload로 시작합니다.
+현재 benchmark suite는 다음 기준 workload를 포함합니다.
 
 ```text
 vector_add        : streaming memory-bound
+saxpy             : streaming vector update
 random_gather     : irregular memory / latency-bound
+reduction         : bandwidth-sensitive parallel primitive
+matrix_transpose  : data-layout transformation dominated by memory movement
 matrix_mul_tiled  : initial GEMM baseline; not yet a strong compute-bound reference
 cublas_sgemm      : optimized cuBLAS GEMM compute-throughput reference
 ```
@@ -228,7 +231,10 @@ cublas_sgemm      : optimized cuBLAS GEMM compute-throughput reference
 ```text
 profiles/gpu_profile.csv
 profiles/vector_add_nvprof.log
+profiles/saxpy_nvprof.log
 profiles/random_gather_nvprof.log
+profiles/reduction_nvprof.log
+profiles/matrix_transpose_nvprof.log
 profiles/matrix_mul_tiled_nvprof.log
 profiles/cublas_sgemm_nvprof.log
 ```

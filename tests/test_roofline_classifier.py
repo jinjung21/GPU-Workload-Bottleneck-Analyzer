@@ -69,3 +69,24 @@ def test_classifier_keeps_compute_bound_kernel_low_priority() -> None:
     assert result.loc[0, "bottleneck_classification"] == "compute-bound"
     assert result.loc[0, "pim_nmp_suitability"] == "low PIM priority"
     assert result.loc[0, "pim_nmp_score"] < 35
+
+
+def test_roofline_handles_zero_flop_data_movement_kernel() -> None:
+    hardware = HardwareConfig(peak_flops=10e12, peak_memory_bandwidth=500e9)
+    profile = pd.DataFrame(
+        {
+            "kernel_name": ["transpose"],
+            "runtime_ms": [1.0],
+            "flops": [0.0],
+            "dram_read_bytes": [1024.0],
+            "dram_write_bytes": [1024.0],
+            "memory_access_pattern": ["regular"],
+            "notes": [""],
+        }
+    )
+
+    result = add_roofline_metrics(profile, hardware)
+
+    assert result.loc[0, "arithmetic_intensity"] == 0.0
+    assert result.loc[0, "roofline_utilization_raw"] == 0.0
+    assert not bool(result.loc[0, "exceeds_roofline"])

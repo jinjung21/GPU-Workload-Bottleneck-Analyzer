@@ -1,5 +1,8 @@
 source,benchmark,aliases,domain,paper_memory_bound,expected_pim_candidate,expected_pim_priority,expected_min_score,operation_complexity,communication_intensity,partitionability,host_transfer_sensitivity,data_reuse_potential,paper_notes
 RTX2080Ti local benchmark,vector_add,VA|vector-add|vector addition,CUDA microbenchmark,True,True,medium,45,low,low,high,low,low,Streaming vector addition is a memory-bandwidth-bound reference.
+RTX2080Ti local benchmark,saxpy,AXPY|stream_triad|triad,CUDA microbenchmark,True,True,medium,45,low,low,high,low,low,SAXPY is a streaming vector update with low arithmetic intensity.
 RTX2080Ti local benchmark,random_gather,gather|embedding_lookup|random-gather,CUDA microbenchmark,True,True,high,60,low,medium,medium,medium,low,Random gather is an irregular latency-sensitive memory workload.
+RTX2080Ti local benchmark,reduction,reduce|RED|parallel_reduction,CUDA microbenchmark,True,True,medium,50,low,medium,high,low,low,Reduction is a bandwidth-sensitive parallel primitive with synchronization phases.
+RTX2080Ti local benchmark,matrix_transpose,transpose|TRNS|matrix-transpose,CUDA microbenchmark,True,True,medium,50,low,low,high,low,low,Matrix transpose is a data-layout transformation dominated by memory movement.
 RTX2080Ti local benchmark,matrix_mul_tiled,tiled_gemm|gemm_tiled|GEMM-TILED,CUDA microbenchmark,False,False,low,0,medium,low,high,medium,high,"Current hand-written tiled GEMM has high data reuse, so it is a negative control for naive PIM offload."
 RTX2080Ti local benchmark,cublas_sgemm,sgemm|GEMM|cuBLAS SGEMM,CUDA library benchmark,False,False,low,0,high,low,high,medium,high,cuBLAS SGEMM is used as an optimized compute-throughput and high-reuse reference.
