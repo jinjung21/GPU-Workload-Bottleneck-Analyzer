@@ -19,6 +19,7 @@ class WorkloadFeatures:
     communication_intensity: float
     partitionability: float
     host_transfer_sensitivity: float
+    data_reuse_potential: float
 
 
 def extract_workload_features(
@@ -40,6 +41,19 @@ def extract_workload_features(
     dram_bytes = float(profile_row["dram_bytes"])
     access_pattern = str(profile_row["memory_access_pattern"]).lower()
 
+    compute_complexity = _metadata_level(
+        metadata_row,
+        "operation_complexity",
+        {"low": 0.2, "medium": 0.55, "high": 1.0},
+        0.5,
+    )
+    data_reuse_potential = _metadata_level(
+        metadata_row,
+        "data_reuse_potential",
+        {"low": 0.1, "medium": 0.5, "high": 0.9},
+        _infer_data_reuse(intensity, hardware.ridge_point, compute_complexity, access_pattern),
+    )
+
     return WorkloadFeatures(
         arithmetic_intensity=intensity,
         memory_pressure=_clamp01(1.0 - min(roofline_ratio, 1.0)),
@@ -47,7 +61,7 @@ def extract_workload_features(
         bandwidth_pressure=_clamp01(achieved_bandwidth / hardware.peak_memory_bandwidth),
         traffic_gb=dram_bytes / 1e9,
         irregularity=1.0 if access_pattern == "irregular" else 0.0,
-        compute_complexity=_metadata_level(metadata_row, "operation_complexity", {"low": 0.2, "medium": 0.55, "high": 1.0}, 0.5),
+        compute_complexity=compute_complexity,
         communication_intensity=_metadata_level(
             metadata_row,
             "communication_intensity",
@@ -61,6 +75,7 @@ def extract_workload_features(
             {"low": 0.1, "medium": 0.5, "high": 1.0},
             0.5,
         ),
+        data_reuse_potential=data_reuse_potential,
     )
 
 
@@ -77,3 +92,20 @@ def _metadata_level(
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
+
+
+def _infer_data_reuse(
+    arithmetic_intensity: float,
+    ridge_point: float,
+    compute_complexity: float,
+    access_pattern: str,
+) -> float:
+    if access_pattern == "irregular":
+        return 0.2
+    if ridge_point > 0 and arithmetic_intensity >= ridge_point:
+        return 0.8
+    if compute_complexity >= 0.85:
+        return 0.75
+    if compute_complexity >= 0.5 and arithmetic_intensity >= 1.0:
+        return 0.6
+    return 0.2

@@ -81,7 +81,7 @@ heuristic_v1  : 기존 PIM/NMP score가 60점 이상이면 candidate
 analytical_v2 : PIM memory/compute/host-transfer/sync time을 추정하고 risk gate 적용
 ```
 
-`analytical_v2`와 `feature_cost_v3`는 다음 형태의 추정식을 사용합니다.
+`analytical_v2`, `feature_cost_v3`, `feature_cost_v4`는 다음 형태의 추정식을 사용합니다.
 
 ```text
 estimated_pim_time =
@@ -93,7 +93,7 @@ estimated_pim_time =
 estimated_speedup = gpu_proxy_runtime / estimated_pim_time
 ```
 
-`feature_cost_v3`는 metadata label만으로 gate를 거는 대신, profile에서 얻은 numeric feature와 임시 paper metadata를 결합해 GPU/PIM cost를 비교합니다.
+`feature_cost_v3`는 metadata label만으로 gate를 거는 대신, profile에서 얻은 numeric feature와 임시 paper metadata를 결합해 GPU/PIM cost를 비교합니다. `feature_cost_v4`는 여기에 data reuse proxy를 추가해서 cache/shared-memory reuse가 큰 dense compute kernel을 PIM 후보에서 더 강하게 제외합니다.
 
 ```text
 memory_pressure
@@ -104,9 +104,11 @@ operation_complexity
 communication_intensity
 partitionability
 host_transfer_sensitivity
+data_reuse_potential
 ```
 
 이 모델은 `SORT`처럼 낮은 arithmetic intensity와 irregular access만 보면 좋아 보이지만 communication/host-transfer risk가 큰 workload를 false positive로 분류하지 않도록 설계되었습니다.
+`feature_cost_v4`는 `matrix_mul_tiled`처럼 bandwidth를 많이 쓰더라도 data reuse가 큰 GEMM 계열 workload를 naive PIM candidate로 보지 않도록 설계되었습니다.
 
 All model assumptions and temporary thresholds are documented in `docs/model_assumptions.md`.
 
@@ -249,7 +251,7 @@ Not available yet:
 - memory latency counters
 ```
 
-When counter access is enabled, these metrics should be added to the feature vector used by `feature_cost_v3`.
+Until those counters are available, `feature_cost_v4` uses `data_reuse_potential` as a proxy for cache/shared-memory reuse. When counter access is enabled, measured cache metrics should replace or calibrate this proxy feature.
 
 ## Outputs
 
@@ -276,14 +278,14 @@ notes
 
 - Nsight Compute performance counter 기반 metric은 아직 사용하지 않습니다.
 - `PIM/NMP score`는 아직 calibration 전의 heuristic component를 포함합니다.
-- `feature_cost_v3`는 실제 PIM hardware 측정값이 아니라 analytical opportunity estimate입니다.
+- `feature_cost_v3`/`feature_cost_v4`는 실제 PIM hardware 측정값이 아니라 analytical opportunity estimate입니다.
 - Roofline을 초과하는 측정값은 단위 오류 또는 hardware config 오류 가능성이 있으므로 report에 별도 표시합니다.
 - 현재 CUDA benchmark의 FLOPs/DRAM bytes는 benchmark 구조에서 계산한 theoretical count입니다.
 - 현재 CUDA benchmark suite는 작으며, 더 다양한 memory access pattern과 problem size sweep이 필요합니다.
 
 ## Future Work
 
-- 실제 GPU benchmark metadata 추가 및 `feature_cost_v3` comparison 연결
+- 더 다양한 실제 GPU benchmark metadata와 size sweep 추가
 - Nsight Compute performance counter 권한 확보 후 CSV parser 추가
 - cache hit rate, memory latency, occupancy, warp divergence metric 반영
 - PIM/NMP model threshold와 risk parameter를 논문/실측 데이터 기반으로 calibration

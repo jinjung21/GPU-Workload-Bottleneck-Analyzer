@@ -75,7 +75,10 @@ def save_model_comparison_plot(
     output.parent.mkdir(parents=True, exist_ok=True)
 
     metrics = model_metrics.copy().sort_values("f1", ascending=False)
-    speedup_model = "feature_cost_v3" if "feature_cost_v3" in set(model_comparison["model"]) else "analytical_v2"
+    models = set(model_comparison["model"])
+    speedup_model = "feature_cost_v4" if "feature_cost_v4" in models else "feature_cost_v3"
+    if speedup_model not in models:
+        speedup_model = "analytical_v2"
     speedups = model_comparison[model_comparison["model"] == speedup_model].copy()
     speedups["estimated_speedup"] = pd.to_numeric(speedups["estimated_speedup"], errors="coerce")
     speedups = speedups.sort_values("estimated_speedup", ascending=True)

@@ -66,11 +66,21 @@ analytical_v2 speedup threshold: estimated speedup >= 1.10
 feature_cost_v3 speedup threshold: estimated speedup >= 1.10
 feature_cost_v3 memory pressure floor: memory_pressure >= 0.25
 feature_cost_v3 risk cutoff: risk_score < 0.75
+feature_cost_v4 speedup threshold: estimated speedup >= 1.10
+feature_cost_v4 memory pressure floor: memory_pressure >= 0.25
+feature_cost_v4 risk cutoff: risk_score < 0.75
+feature_cost_v4 dense-reuse gate: high reuse + medium/high compute complexity is not a PIM candidate
 ```
 
 These thresholds are intentionally documented as calibration targets. They are
 used to compare model behavior on proxy workloads, but should be retuned when
 more measured GPU profiles or PIM/NMP reference data become available.
+
+`feature_cost_v4` adds a temporary `data_reuse_potential` proxy. This is meant
+to stand in for cache/shared-memory reuse until L1/L2/cache transaction counters
+are available. The motivation is that matrix multiplication and convolution can
+move a lot of bytes, but they reuse data heavily and are usually a poor match
+for naive PIM offload compared with streaming or irregular memory-side kernels.
 
 ## Current Evidence Levels
 
@@ -81,7 +91,7 @@ more measured GPU profiles or PIM/NMP reference data become available.
 | CUDA benchmark runtime | Measured on RTX 2080 Ti with CUDA events | High |
 | Benchmark FLOPs/DRAM bytes | Theoretical count from benchmark structure | Medium |
 | PIM/NMP score thresholds | Project heuristic | Low-medium |
-| analytical_v2 / feature_cost_v3 speedup | Analytical opportunity estimate | Low-medium |
+| analytical_v2 / feature_cost_v3 / feature_cost_v4 speedup | Analytical opportunity estimate | Low-medium |
 | PrIM workload labels | Literature-inspired workload categories | Medium |
 
 ## Key References

@@ -143,7 +143,10 @@ def _build_model_comparison_section(
     if model_comparison is None or model_metrics is None:
         return []
 
-    speedup_model = "feature_cost_v3" if "feature_cost_v3" in set(model_comparison["model"]) else "analytical_v2"
+    models = set(model_comparison["model"])
+    speedup_model = "feature_cost_v4" if "feature_cost_v4" in models else "feature_cost_v3"
+    if speedup_model not in models:
+        speedup_model = "analytical_v2"
     speedup = model_comparison[model_comparison["model"] == speedup_model].copy()
     speedup = speedup.sort_values("estimated_speedup", ascending=False)
     speedup_columns = [
@@ -169,7 +172,7 @@ def _build_model_comparison_section(
     return [
         "## Model Comparison",
         "",
-        "The table compares simple baselines against the analytical PIM/NMP model using literature-labeled proxy workloads.",
+        "The table compares simple baselines against analytical and feature-cost PIM/NMP candidate models.",
         *figure_lines,
         "",
         metric_table.to_markdown(index=False),

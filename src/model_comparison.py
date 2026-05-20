@@ -6,6 +6,7 @@ import pandas as pd
 
 from .config import HardwareConfig
 from .cost_model_v3 import estimate_feature_cost_v3
+from .cost_model_v4 import estimate_feature_cost_v4
 
 
 @dataclass(frozen=True)
@@ -44,9 +45,11 @@ def build_model_comparison(
         predictions["analytical_v2"] = _predict_analytical_candidate(analytical, expected, config)
         feature_cost = estimate_feature_cost_v3(matched, hardware, expected)
         predictions["feature_cost_v3"] = bool(feature_cost["predicted_candidate"])
+        feature_cost_v4 = estimate_feature_cost_v4(matched, hardware, expected)
+        predictions["feature_cost_v4"] = bool(feature_cost_v4["predicted_candidate"])
 
         for model_name, predicted in predictions.items():
-            estimate = _model_estimate(model_name, analytical, feature_cost)
+            estimate = _model_estimate(model_name, analytical, feature_cost, feature_cost_v4)
             rows.append(
                 {
                     "model": model_name,
@@ -125,6 +128,7 @@ def _model_estimate(
     model_name: str,
     analytical: dict[str, float | str],
     feature_cost: dict[str, float | str | bool],
+    feature_cost_v4: dict[str, float | str | bool],
 ) -> dict[str, object]:
     if model_name == "analytical_v2":
         return {
@@ -139,6 +143,13 @@ def _model_estimate(
             "estimated_pim_time_ms": feature_cost["estimated_pim_time_ms"],
             "risk": feature_cost["risk"],
             "feature_summary": feature_cost["feature_summary"],
+        }
+    if model_name == "feature_cost_v4":
+        return {
+            "estimated_speedup": feature_cost_v4["estimated_speedup"],
+            "estimated_pim_time_ms": feature_cost_v4["estimated_pim_time_ms"],
+            "risk": feature_cost_v4["risk"],
+            "feature_summary": feature_cost_v4["feature_summary"],
         }
     return {
         "estimated_speedup": "",

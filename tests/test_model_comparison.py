@@ -2,6 +2,7 @@ import pandas as pd
 
 from src.config import HardwareConfig
 from src.cost_model_v3 import estimate_feature_cost_v3
+from src.cost_model_v4 import estimate_feature_cost_v4
 from src.model_comparison import build_model_comparison, estimate_pim_speedup
 from src.roofline import add_roofline_metrics
 from src.classifier import add_classifications
@@ -43,9 +44,11 @@ def test_model_comparison_reports_false_positive_for_traffic_only() -> None:
     traffic = metrics[metrics["model"] == "traffic_only"].iloc[0]
     analytical = metrics[metrics["model"] == "analytical_v2"].iloc[0]
     feature_v3 = metrics[metrics["model"] == "feature_cost_v3"].iloc[0]
+    feature_v4 = metrics[metrics["model"] == "feature_cost_v4"].iloc[0]
     assert traffic["fp"] == 1
     assert analytical["tn"] == 1
     assert feature_v3["tn"] == 1
+    assert feature_v4["tn"] == 1
     assert not bool(comparison[comparison["model"] == "analytical_v2"].iloc[0]["predicted_candidate"])
 
 
@@ -99,3 +102,32 @@ def test_feature_cost_v3_rejects_sort_like_high_transfer_workload() -> None:
     assert estimate["estimated_speedup"] > 1.0
     assert not estimate["predicted_candidate"]
     assert "host transfer sensitive" in estimate["risk"]
+
+
+def test_feature_cost_v4_penalizes_high_reuse_dense_gemm() -> None:
+    hardware = HardwareConfig(peak_flops=13.45e12, peak_memory_bandwidth=616e9)
+    profile_row = pd.Series(
+        {
+            "runtime_s": 0.00113,
+            "flops": 2_147_483_648.0,
+            "dram_bytes": 541_065_216.0,
+            "arithmetic_intensity": 3.969,
+            "achieved_flops": 1.90e12,
+            "achieved_bandwidth": 479e9,
+            "memory_access_pattern": "regular",
+        }
+    )
+    metadata_row = pd.Series(
+        {
+            "operation_complexity": "medium",
+            "communication_intensity": "low",
+            "partitionability": "high",
+            "host_transfer_sensitivity": "medium",
+            "data_reuse_potential": "high",
+        }
+    )
+
+    estimate = estimate_feature_cost_v4(profile_row, hardware, metadata_row)
+
+    assert not estimate["predicted_candidate"]
+    assert "high data reuse" in estimate["risk"]
