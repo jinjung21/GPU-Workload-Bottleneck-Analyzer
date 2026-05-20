@@ -110,6 +110,24 @@ data_reuse_potential
 이 모델은 `SORT`처럼 낮은 arithmetic intensity와 irregular access만 보면 좋아 보이지만 communication/host-transfer risk가 큰 workload를 false positive로 분류하지 않도록 설계되었습니다.
 `feature_cost_v4`는 `matrix_mul_tiled`처럼 bandwidth를 많이 쓰더라도 data reuse가 큰 GEMM 계열 workload를 naive PIM candidate로 보지 않도록 설계되었습니다.
 
+The report also includes an end-to-end policy estimate:
+
+```text
+GPU-only total runtime
+vs.
+AI-only offload policy
+vs.
+traffic-only offload policy
+vs.
+heuristic_v1
+vs.
+feature_cost_v4
+```
+
+Each policy decides which kernels to offload. The runtime comparison then uses
+the same `feature_cost_v4` PIM/NMP time estimate for all selected kernels, so
+the table measures offload decision quality under a common cost model.
+
 All model assumptions and temporary thresholds are documented in `docs/model_assumptions.md`.
 
 PrIM proxy profile로 model comparison report를 생성하려면 다음 명령을 사용합니다.

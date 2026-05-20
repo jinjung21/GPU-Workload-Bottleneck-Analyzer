@@ -129,5 +129,6 @@ def test_feature_cost_v4_penalizes_high_reuse_dense_gemm() -> None:
 
     estimate = estimate_feature_cost_v4(profile_row, hardware, metadata_row)
 
+    assert estimate["estimated_speedup"] < 1.0
     assert not estimate["predicted_candidate"]
     assert "high data reuse" in estimate["risk"]

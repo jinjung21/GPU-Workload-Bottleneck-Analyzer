@@ -104,7 +104,7 @@ def _communication_factor(features: WorkloadFeatures) -> float:
 
 
 def _reuse_migration_factor(features: WorkloadFeatures) -> float:
-    return 0.18 * features.data_reuse_potential * features.compute_complexity
+    return 0.45 * features.data_reuse_potential * features.compute_complexity
 
 
 def _risk_score(features: WorkloadFeatures) -> float:

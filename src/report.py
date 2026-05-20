@@ -47,6 +47,8 @@ def save_markdown_report(
     model_comparison: pd.DataFrame | None = None,
     model_metrics: pd.DataFrame | None = None,
     model_figure_path: str | Path | None = None,
+    end_to_end: pd.DataFrame | None = None,
+    end_to_end_figure_path: str | Path | None = None,
 ) -> None:
     """Write a markdown analysis report."""
 
@@ -57,6 +59,7 @@ def save_markdown_report(
     summary = build_summary_table(profile)
     baseline_section = _build_baseline_section(baseline_comparison)
     model_section = _build_model_comparison_section(model_comparison, model_metrics, model_figure_path, output.parent)
+    end_to_end_section = _build_end_to_end_section(end_to_end, end_to_end_figure_path, output.parent)
     exceeded = profile[profile["exceeds_roofline"]]
     warnings = []
     if not exceeded.empty:
@@ -91,13 +94,14 @@ def save_markdown_report(
         "",
         *baseline_section,
         *model_section,
+        *end_to_end_section,
         "## Notes",
         "",
         "- Reports can be generated from proxy CSVs or CUDA benchmark profile CSVs.",
         "- PIM/NMP suitability still includes heuristic components that require calibration.",
         "- Nsight Compute counter-based parsing can be added when performance counter permissions are available.",
         "- Paper baseline comparison checks workload-category alignment, not measured PIM speedup.",
-        "- Analytical PIM estimates are sensitivity-model outputs, not hardware measurements.",
+        "- Analytical PIM and end-to-end speedup estimates are model outputs, not hardware measurements.",
         "",
     ]
     output.write_text("\n".join(report), encoding="utf-8")
@@ -180,6 +184,44 @@ def _build_model_comparison_section(
         f"### {speedup_model} PIM/NMP Estimates",
         "",
         speedup[speedup_columns].to_markdown(index=False),
+        "",
+    ]
+
+
+def _build_end_to_end_section(
+    end_to_end: pd.DataFrame | None,
+    figure_path: str | Path | None,
+    report_dir: Path,
+) -> list[str]:
+    if end_to_end is None or end_to_end.empty:
+        return []
+
+    table = end_to_end.copy()
+    table["total_runtime_ms"] = table["total_runtime_ms"].map(lambda value: f"{value:.3f}")
+    table["speedup_vs_gpu"] = table["speedup_vs_gpu"].map(lambda value: f"{value:.2f}x")
+    table["runtime_reduction_pct"] = table["runtime_reduction_pct"].map(lambda value: f"{value:.1f}%")
+    columns = [
+        "model",
+        "total_runtime_ms",
+        "speedup_vs_gpu",
+        "runtime_reduction_pct",
+        "offloaded_kernels",
+        "false_offloads",
+        "missed_candidates",
+    ]
+
+    figure_lines = []
+    if figure_path is not None:
+        figure_link = _relative_link(Path(figure_path), report_dir)
+        figure_lines = ["", f"![End-to-End Runtime](../{figure_link})" if not figure_link.startswith("..") else f"![End-to-End Runtime]({figure_link})", ""]
+
+    return [
+        "## End-to-End Policy Estimate",
+        "",
+        "This section estimates total workload runtime by applying each offload policy to the same kernels. Candidate kernels use the common `feature_cost_v4` PIM/NMP time estimate; non-candidates keep measured GPU runtime.",
+        *figure_lines,
+        "",
+        table[columns].to_markdown(index=False),
         "",
     ]
 

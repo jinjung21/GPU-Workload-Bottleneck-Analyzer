@@ -56,6 +56,7 @@ def build_model_comparison(
                     "benchmark": expected["benchmark"],
                     "target_candidate": target,
                     "predicted_candidate": predicted,
+                    "gpu_runtime_ms": float(matched["runtime_ms"]),
                     "estimated_speedup": estimate["estimated_speedup"],
                     "estimated_pim_time_ms": estimate["estimated_pim_time_ms"],
                     "risk": estimate["risk"],

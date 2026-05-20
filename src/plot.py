@@ -110,6 +110,34 @@ def save_model_comparison_plot(
     plt.close(fig)
 
 
+def save_end_to_end_plot(end_to_end: pd.DataFrame, output_path: str | Path) -> None:
+    """Save an estimated total-runtime comparison across offload policies."""
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    data = end_to_end.copy().sort_values("total_runtime_ms", ascending=True)
+    colors = ["#2ca02c" if model == "feature_cost_v4" else "#1f77b4" for model in data["model"]]
+    colors = ["#7f7f7f" if model == "gpu_only" else color for model, color in zip(data["model"], colors)]
+    colors = ["#9467bd" if model == "oracle_labels" else color for model, color in zip(data["model"], colors)]
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    axes[0].barh(data["model"], data["total_runtime_ms"], color=colors)
+    axes[0].set_title("Estimated End-to-End Runtime")
+    axes[0].set_xlabel("Total runtime (ms)")
+    axes[0].grid(axis="x", linestyle=":", linewidth=0.6)
+
+    axes[1].barh(data["model"], data["speedup_vs_gpu"], color=colors)
+    axes[1].axvline(1.0, color="#444444", linestyle="--", linewidth=1.0)
+    axes[1].set_title("Estimated Speedup vs GPU-only")
+    axes[1].set_xlabel("Speedup")
+    axes[1].grid(axis="x", linestyle=":", linewidth=0.6)
+
+    fig.tight_layout()
+    fig.savefig(output, dpi=180)
+    plt.close(fig)
+
+
 def _logspace(start: float, stop: float, points: int) -> list[float]:
     """Small helper to avoid adding NumPy as a direct dependency."""
 

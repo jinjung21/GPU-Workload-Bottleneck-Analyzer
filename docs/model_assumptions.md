@@ -82,6 +82,23 @@ are available. The motivation is that matrix multiplication and convolution can
 move a lot of bytes, but they reuse data heavily and are usually a poor match
 for naive PIM offload compared with streaming or irregular memory-side kernels.
 
+## End-to-End Policy Estimate
+
+The end-to-end table is not a hardware-measured PIM speedup. It is a decision
+policy estimate:
+
+```text
+if model predicts PIM candidate:
+    use feature_cost_v4 estimated PIM/NMP time
+else:
+    use measured GPU runtime
+```
+
+All policies use the same `feature_cost_v4` timing estimate when they offload a
+kernel. This isolates the quality of the offload decision from the cost formula.
+`gpu_only` is the measured GPU-runtime sum, and `oracle_labels` is an upper
+reference based on the current benchmark labels.
+
 ## Current Evidence Levels
 
 | Component | Current basis | Confidence |
