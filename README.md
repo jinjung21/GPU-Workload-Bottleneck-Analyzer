@@ -279,7 +279,7 @@ python3 main.py \
   --peak-memory-bandwidth 616000000000
 ```
 
-`--pim-simulation`을 사용하면 end-to-end policy estimate에서 offload된 kernel은 analytical estimate 대신 simulated PIM runtime을 사용합니다. GPU에 남긴 kernel은 measured GPU runtime을 그대로 사용합니다.
+`--pim-simulation`을 사용하면 end-to-end policy estimate에서 offload된 kernel은 simulated PIM runtime을 우선 사용합니다. Simulator coverage가 없는 kernel은 analytical estimate로 fallback하고, GPU에 남긴 kernel은 measured GPU runtime을 그대로 사용합니다.
 
 ## Cache Metrics
 

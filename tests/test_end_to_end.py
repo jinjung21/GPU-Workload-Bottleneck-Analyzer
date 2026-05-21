@@ -82,3 +82,33 @@ def test_end_to_end_evaluation_can_use_simulated_pim_runtime() -> None:
 
     assert feature_v4["total_runtime_ms"] == 4.4
     assert feature_v4["runtime_source"] == "simulated"
+
+
+def test_end_to_end_evaluation_falls_back_when_simulation_is_partial() -> None:
+    comparison = pd.DataFrame(
+        [
+            {
+                "model": "feature_cost_v4",
+                "benchmark": "vector_add",
+                "target_candidate": True,
+                "predicted_candidate": True,
+                "gpu_runtime_ms": 1.0,
+                "estimated_pim_time_ms": 0.25,
+                "simulated_pim_time_ms": 0.40,
+            },
+            {
+                "model": "feature_cost_v4",
+                "benchmark": "reduction",
+                "target_candidate": True,
+                "predicted_candidate": True,
+                "gpu_runtime_ms": 2.0,
+                "estimated_pim_time_ms": 0.50,
+                "simulated_pim_time_ms": pd.NA,
+            },
+        ]
+    )
+
+    evaluation = build_end_to_end_evaluation(comparison, runtime_source="simulated")
+    feature_v4 = evaluation[evaluation["model"] == "feature_cost_v4"].iloc[0]
+
+    assert feature_v4["total_runtime_ms"] == 0.9

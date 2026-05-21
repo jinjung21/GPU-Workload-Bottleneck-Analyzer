@@ -238,7 +238,7 @@ def _build_simulation_section(summary: dict[str, int | float | str] | None) -> l
         "",
         f"- Simulator source: {summary.get('simulators', '')}.",
         f"- Coverage: {summary.get('simulated', 0)}/{summary.get('benchmarks', 0)} profiled benchmarks have simulated PIM runtime ({summary.get('coverage', 0.0):.1%}).",
-        "- End-to-end policy estimates use simulated PIM runtime for offloaded kernels.",
+        "- End-to-end policy estimates use simulated PIM runtime where available and fall back to analytical estimates for uncovered kernels.",
         "",
     ]
 

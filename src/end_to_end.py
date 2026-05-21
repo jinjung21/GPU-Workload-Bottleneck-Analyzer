@@ -23,9 +23,8 @@ def build_end_to_end_evaluation(
         raise ValueError(f"Unsupported runtime source: {runtime_source}")
 
     cost_rows = model_comparison[model_comparison["model"] == cost_model].copy()
-    cost_column = _cost_column(cost_rows, runtime_source)
-    cost_rows[cost_column] = pd.to_numeric(cost_rows[cost_column], errors="raise")
-    cost_by_benchmark = cost_rows.set_index("benchmark")[cost_column].to_dict()
+    cost_rows["selected_pim_time_ms"] = _select_pim_runtime(cost_rows, runtime_source)
+    cost_by_benchmark = cost_rows.set_index("benchmark")["selected_pim_time_ms"].to_dict()
     gpu_by_benchmark = cost_rows.set_index("benchmark")["gpu_runtime_ms"].to_dict()
     target_by_benchmark = cost_rows.set_index("benchmark")["target_candidate"].astype(bool).to_dict()
     gpu_only_ms = float(sum(gpu_by_benchmark.values()))
@@ -112,12 +111,11 @@ def _oracle_row(
     }
 
 
-def _cost_column(cost_rows: pd.DataFrame, runtime_source: str) -> str:
+def _select_pim_runtime(cost_rows: pd.DataFrame, runtime_source: str) -> pd.Series:
     if runtime_source == "estimated":
-        return "estimated_pim_time_ms"
+        return pd.to_numeric(cost_rows["estimated_pim_time_ms"], errors="raise")
     if "simulated_pim_time_ms" not in cost_rows.columns:
         raise ValueError("simulated runtime source requested, but simulated_pim_time_ms is missing")
-    if cost_rows["simulated_pim_time_ms"].isna().any():
-        missing = ", ".join(cost_rows.loc[cost_rows["simulated_pim_time_ms"].isna(), "benchmark"].astype(str))
-        raise ValueError(f"Missing simulated PIM time for benchmarks: {missing}")
-    return "simulated_pim_time_ms"
+    estimated = pd.to_numeric(cost_rows["estimated_pim_time_ms"], errors="raise")
+    simulated = pd.to_numeric(cost_rows["simulated_pim_time_ms"], errors="coerce")
+    return simulated.fillna(estimated)

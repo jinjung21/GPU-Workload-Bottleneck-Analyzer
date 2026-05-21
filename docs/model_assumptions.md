@@ -104,7 +104,8 @@ offloaded-kernel timing source:
 
 ```text
 if model predicts PIM candidate:
-    use simulated_pim_time_ms from the simulator adapter CSV
+    use simulated_pim_time_ms from the simulator adapter CSV when available
+    otherwise fall back to feature_cost_v4 estimated PIM/NMP time
 else:
     use measured GPU runtime
 ```
