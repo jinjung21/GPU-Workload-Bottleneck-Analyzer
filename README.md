@@ -253,6 +253,34 @@ python3 main.py \
 
 이 profiling path는 Nsight Compute performance counter 권한이 없는 서버에서도 동작하도록 설계되었습니다. CUDA event로 runtime을 측정하고, benchmark 코드에서 theoretical FLOPs/DRAM bytes를 함께 기록합니다. `nvprof` log는 raw profiler evidence로 저장됩니다.
 
+## PIM Simulator Integration
+
+실제 PIM hardware가 없어도, 오픈소스 PIM simulator 결과를 analyzer에 연결할 수 있습니다. 외부 simulator를 이 repository 안에 직접 vendoring하지 않고, simulator output을 공통 CSV schema로 변환해서 입력합니다.
+
+Simulator CSV schema:
+
+```text
+kernel_name
+simulator
+simulated_pim_time_ms
+notes
+```
+
+예시:
+
+```bash
+python3 main.py \
+  --input profiles/gpu_profile.csv \
+  --paper-baseline paper_baselines/gpu_benchmark_metadata.csv \
+  --pim-simulation simulators/sample_pim_simulation.csv \
+  --output-dir outputs/gpu_profile_with_pim_sim \
+  --hardware-name "RTX 2080 Ti" \
+  --peak-flops 13450000000000 \
+  --peak-memory-bandwidth 616000000000
+```
+
+`--pim-simulation`을 사용하면 end-to-end policy estimate에서 offload된 kernel은 analytical estimate 대신 simulated PIM runtime을 사용합니다. GPU에 남긴 kernel은 measured GPU runtime을 그대로 사용합니다.
+
 ## Cache Metrics
 
 Cache behavior is important for distinguishing true DRAM bandwidth bottlenecks from cache locality or latency problems. The current server blocks Nsight Compute performance counters, so the analyzer cannot yet ingest L1/L2 hit rates, memory transactions, occupancy, or warp divergence.
@@ -303,6 +331,7 @@ notes
 - Nsight Compute performance counter 기반 metric은 아직 사용하지 않습니다.
 - `PIM/NMP score`는 아직 calibration 전의 heuristic component를 포함합니다.
 - `feature_cost_v3`/`feature_cost_v4`는 실제 PIM hardware 측정값이 아니라 analytical opportunity estimate입니다.
+- `--pim-simulation` 결과는 simulator 기반 결과이며 실제 PIM silicon 측정값은 아닙니다.
 - Roofline을 초과하는 측정값은 단위 오류 또는 hardware config 오류 가능성이 있으므로 report에 별도 표시합니다.
 - 현재 CUDA benchmark의 FLOPs/DRAM bytes는 benchmark 구조에서 계산한 theoretical count입니다.
 - 현재 CUDA benchmark suite는 작으며, 더 다양한 memory access pattern과 problem size sweep이 필요합니다.
@@ -313,4 +342,5 @@ notes
 - Nsight Compute performance counter 권한 확보 후 CSV parser 추가
 - cache hit rate, memory latency, occupancy, warp divergence metric 반영
 - PIM/NMP model threshold와 risk parameter를 논문/실측 데이터 기반으로 calibration
+- SAIT PIMSimulator 또는 Ramulator-PIM adapter 추가
 - PrIM/UPMEM case study와 실제 RTX 2080 Ti profiling 결과 비교

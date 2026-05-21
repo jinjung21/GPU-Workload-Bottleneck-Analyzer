@@ -49,6 +49,7 @@ def save_markdown_report(
     model_figure_path: str | Path | None = None,
     end_to_end: pd.DataFrame | None = None,
     end_to_end_figure_path: str | Path | None = None,
+    simulation_summary: dict[str, int | float | str] | None = None,
 ) -> None:
     """Write a markdown analysis report."""
 
@@ -60,6 +61,7 @@ def save_markdown_report(
     baseline_section = _build_baseline_section(baseline_comparison)
     model_section = _build_model_comparison_section(model_comparison, model_metrics, model_figure_path, output.parent)
     end_to_end_section = _build_end_to_end_section(end_to_end, end_to_end_figure_path, output.parent)
+    simulation_section = _build_simulation_section(simulation_summary)
     exceeded = profile[profile["exceeds_roofline"]]
     warnings = []
     if not exceeded.empty:
@@ -94,6 +96,7 @@ def save_markdown_report(
         "",
         *baseline_section,
         *model_section,
+        *simulation_section,
         *end_to_end_section,
         "## Notes",
         "",
@@ -208,6 +211,7 @@ def _build_end_to_end_section(
         "offloaded_kernels",
         "false_offloads",
         "missed_candidates",
+        "runtime_source",
     ]
 
     figure_lines = []
@@ -218,10 +222,23 @@ def _build_end_to_end_section(
     return [
         "## End-to-End Policy Estimate",
         "",
-        "This section estimates total workload runtime by applying each offload policy to the same kernels. Candidate kernels use the common `feature_cost_v4` PIM/NMP time estimate; non-candidates keep measured GPU runtime.",
+        "This section estimates total workload runtime by applying each offload policy to the same kernels. Candidate kernels use a common PIM/NMP runtime source; non-candidates keep measured GPU runtime.",
         *figure_lines,
         "",
         table[columns].to_markdown(index=False),
+        "",
+    ]
+
+
+def _build_simulation_section(summary: dict[str, int | float | str] | None) -> list[str]:
+    if not summary or int(summary.get("simulated", 0)) == 0:
+        return []
+    return [
+        "## PIM Simulation Input",
+        "",
+        f"- Simulator source: {summary.get('simulators', '')}.",
+        f"- Coverage: {summary.get('simulated', 0)}/{summary.get('benchmarks', 0)} profiled benchmarks have simulated PIM runtime ({summary.get('coverage', 0.0):.1%}).",
+        "- End-to-end policy estimates use simulated PIM runtime for offloaded kernels.",
         "",
     ]
 

@@ -51,3 +51,34 @@ def test_end_to_end_evaluation_uses_common_cost_model() -> None:
     assert feature_v4["false_offloads"] == 0
     assert ai_only["total_runtime_ms"] == 6.25
     assert ai_only["false_offloads"] == 1
+
+
+def test_end_to_end_evaluation_can_use_simulated_pim_runtime() -> None:
+    comparison = pd.DataFrame(
+        [
+            {
+                "model": "feature_cost_v4",
+                "benchmark": "vector_add",
+                "target_candidate": True,
+                "predicted_candidate": True,
+                "gpu_runtime_ms": 1.0,
+                "estimated_pim_time_ms": 0.25,
+                "simulated_pim_time_ms": 0.40,
+            },
+            {
+                "model": "feature_cost_v4",
+                "benchmark": "gemm",
+                "target_candidate": False,
+                "predicted_candidate": False,
+                "gpu_runtime_ms": 4.0,
+                "estimated_pim_time_ms": 6.0,
+                "simulated_pim_time_ms": 8.0,
+            },
+        ]
+    )
+
+    evaluation = build_end_to_end_evaluation(comparison, runtime_source="simulated")
+    feature_v4 = evaluation[evaluation["model"] == "feature_cost_v4"].iloc[0]
+
+    assert feature_v4["total_runtime_ms"] == 4.4
+    assert feature_v4["runtime_source"] == "simulated"

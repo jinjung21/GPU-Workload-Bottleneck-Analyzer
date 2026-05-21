@@ -6,6 +6,7 @@ import pandas as pd
 def build_end_to_end_evaluation(
     model_comparison: pd.DataFrame,
     cost_model: str = "feature_cost_v4",
+    runtime_source: str = "estimated",
 ) -> pd.DataFrame:
     """Estimate total workload runtime for each offload decision policy.
 
@@ -18,10 +19,13 @@ def build_end_to_end_evaluation(
         return pd.DataFrame()
     if cost_model not in set(model_comparison["model"]):
         raise ValueError(f"Missing cost model rows for end-to-end evaluation: {cost_model}")
+    if runtime_source not in {"estimated", "simulated"}:
+        raise ValueError(f"Unsupported runtime source: {runtime_source}")
 
     cost_rows = model_comparison[model_comparison["model"] == cost_model].copy()
-    cost_rows["estimated_pim_time_ms"] = pd.to_numeric(cost_rows["estimated_pim_time_ms"], errors="raise")
-    cost_by_benchmark = cost_rows.set_index("benchmark")["estimated_pim_time_ms"].to_dict()
+    cost_column = _cost_column(cost_rows, runtime_source)
+    cost_rows[cost_column] = pd.to_numeric(cost_rows[cost_column], errors="raise")
+    cost_by_benchmark = cost_rows.set_index("benchmark")[cost_column].to_dict()
     gpu_by_benchmark = cost_rows.set_index("benchmark")["gpu_runtime_ms"].to_dict()
     target_by_benchmark = cost_rows.set_index("benchmark")["target_candidate"].astype(bool).to_dict()
     gpu_only_ms = float(sum(gpu_by_benchmark.values()))
@@ -36,6 +40,7 @@ def build_end_to_end_evaluation(
             "false_offloads": 0,
             "missed_candidates": int(sum(target_by_benchmark.values())),
             "cost_model": cost_model,
+            "runtime_source": runtime_source,
         }
     ]
 
@@ -67,10 +72,12 @@ def build_end_to_end_evaluation(
                 "false_offloads": false_offloads,
                 "missed_candidates": missed_candidates,
                 "cost_model": cost_model,
+                "runtime_source": runtime_source,
             }
         )
 
     rows.append(_oracle_row(gpu_only_ms, gpu_by_benchmark, cost_by_benchmark, target_by_benchmark, cost_model))
+    rows[-1]["runtime_source"] = runtime_source
     return pd.DataFrame(rows).sort_values(
         ["speedup_vs_gpu", "false_offloads", "missed_candidates"],
         ascending=[False, True, True],
@@ -103,3 +110,14 @@ def _oracle_row(
         "missed_candidates": 0,
         "cost_model": cost_model,
     }
+
+
+def _cost_column(cost_rows: pd.DataFrame, runtime_source: str) -> str:
+    if runtime_source == "estimated":
+        return "estimated_pim_time_ms"
+    if "simulated_pim_time_ms" not in cost_rows.columns:
+        raise ValueError("simulated runtime source requested, but simulated_pim_time_ms is missing")
+    if cost_rows["simulated_pim_time_ms"].isna().any():
+        missing = ", ".join(cost_rows.loc[cost_rows["simulated_pim_time_ms"].isna(), "benchmark"].astype(str))
+        raise ValueError(f"Missing simulated PIM time for benchmarks: {missing}")
+    return "simulated_pim_time_ms"

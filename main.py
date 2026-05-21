@@ -14,6 +14,7 @@ from src.parser import load_profile_csv
 from src.plot import save_end_to_end_plot, save_model_comparison_plot, save_roofline_plot
 from src.report import build_summary_table, save_markdown_report
 from src.roofline import add_roofline_metrics
+from src.simulator import attach_simulation_results, load_pim_simulation_csv, summarize_simulation_coverage
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -24,6 +25,8 @@ PRIM_BASELINE_PATH = BASE_DIR / "paper_baselines" / "prim2022_workloads.csv"
 
 def main() -> None:
     args = parse_args()
+    if args.pim_simulation and not args.paper_baseline:
+        raise ValueError("--pim-simulation requires --paper-baseline so simulator rows can be matched to benchmarks")
     hardware = HardwareConfig(
         name=args.hardware_name,
         peak_flops=args.peak_flops,
@@ -42,11 +45,16 @@ def main() -> None:
     model_comparison = None
     model_metrics = None
     end_to_end = None
+    simulation_summary = None
     if args.paper_baseline:
         baseline = load_paper_baseline_csv(args.paper_baseline)
         baseline_comparison = compare_to_paper_baseline(profile, baseline)
         model_comparison, model_metrics = build_model_comparison(profile, baseline, hardware)
-        end_to_end = build_end_to_end_evaluation(model_comparison)
+        simulation = load_pim_simulation_csv(args.pim_simulation) if args.pim_simulation else None
+        model_comparison = attach_simulation_results(model_comparison, simulation)
+        simulation_summary = summarize_simulation_coverage(model_comparison)
+        runtime_source = "simulated" if simulation is not None else "estimated"
+        end_to_end = build_end_to_end_evaluation(model_comparison, runtime_source=runtime_source)
 
     save_roofline_plot(profile, hardware, figure_path)
     if model_comparison is not None and model_metrics is not None:
@@ -64,6 +72,7 @@ def main() -> None:
         model_figure_path if model_comparison is not None else None,
         end_to_end,
         end_to_end_figure_path if end_to_end is not None else None,
+        simulation_summary,
     )
 
     print("\nGPU Workload Bottleneck Analyzer")
@@ -93,6 +102,15 @@ def main() -> None:
         print("End-to-end policy estimate")
         print("-" * 29)
         print(end_to_end.to_string(index=False, formatters=_end_to_end_formatters()))
+    if simulation_summary is not None and simulation_summary["simulated"]:
+        print()
+        print("PIM simulation coverage")
+        print("-" * 23)
+        print(
+            f"Simulated: {simulation_summary['simulated']}/{simulation_summary['benchmarks']}, "
+            f"coverage: {simulation_summary['coverage']:.1%}, "
+            f"simulator: {simulation_summary['simulators']}"
+        )
     print()
     print(f"Saved roofline plot: {figure_path}")
     print(f"Saved report: {report_path}")
@@ -115,6 +133,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help=f"Optional paper workload baseline CSV. Example: {PRIM_BASELINE_PATH}",
+    )
+    parser.add_argument(
+        "--pim-simulation",
+        type=Path,
+        default=None,
+        help="Optional PIM simulator output CSV with kernel_name, simulator, simulated_pim_time_ms.",
     )
     return parser.parse_args()
 

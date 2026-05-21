@@ -99,6 +99,20 @@ kernel. This isolates the quality of the offload decision from the cost formula.
 `gpu_only` is the measured GPU-runtime sum, and `oracle_labels` is an upper
 reference based on the current benchmark labels.
 
+When `--pim-simulation` is provided, the same policy table switches the
+offloaded-kernel timing source:
+
+```text
+if model predicts PIM candidate:
+    use simulated_pim_time_ms from the simulator adapter CSV
+else:
+    use measured GPU runtime
+```
+
+This is still not a silicon measurement. It is a simulator-backed estimate, and
+its confidence depends on the simulator backend, workload mapping, and input
+trace/kernel fidelity.
+
 ## Current Evidence Levels
 
 | Component | Current basis | Confidence |
@@ -109,6 +123,7 @@ reference based on the current benchmark labels.
 | Benchmark FLOPs/DRAM bytes | Theoretical count from benchmark structure | Medium |
 | PIM/NMP score thresholds | Project heuristic | Low-medium |
 | analytical_v2 / feature_cost_v3 / feature_cost_v4 speedup | Analytical opportunity estimate | Low-medium |
+| `--pim-simulation` speedup | External simulator output + policy model | Simulator-dependent |
 | PrIM workload labels | Literature-inspired workload categories | Medium |
 
 ## Key References
