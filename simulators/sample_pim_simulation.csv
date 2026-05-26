@@ -4,5 +4,6 @@ saxpy,example_pim_simulator,0.060,Example only; replace with real simulator outp
 random_gather,example_pim_simulator,0.700,Example only; replace with real simulator output.
 reduction,example_pim_simulator,0.080,Example only; replace with real simulator output.
 matrix_transpose,example_pim_simulator,0.090,Example only; replace with real simulator output.
+gemv,example_pim_simulator,0.013166,Example only; maps to PIMBenchFixture.gemv cycle=13166 under temporary 1ns/cycle conversion.
 matrix_mul_tiled,example_pim_simulator,2.500,Example only; high-reuse GEMM should be replaced with real simulator output.
 cublas_sgemm,example_pim_simulator,6.000,Example only; replace with real simulator output.

@@ -19,6 +19,7 @@ benchmarks=(
   random_gather
   reduction
   matrix_transpose
+  gemv
   matrix_mul_tiled
   cublas_sgemm
 )

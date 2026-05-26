@@ -23,6 +23,7 @@ Example:
 kernel_name,simulator,simulated_pim_time_ms,notes
 vector_add,SAIT-PIMSimulator,0.050,prototype adapter output
 saxpy,SAIT-PIMSimulator,0.060,prototype adapter output
+gemv,SAIT-PIMSimulator,0.013166,PIMBenchFixture.gemv cycle=13166 with temporary 1ns/cycle conversion
 ```
 
 Run the analyzer with simulated PIM timing:
@@ -39,8 +40,8 @@ python3 main.py \
 ```
 
 When `--pim-simulation` is provided, the end-to-end policy table uses simulated
-PIM runtime for offloaded kernels and measured GPU runtime for non-offloaded
-kernels.
+PIM runtime where available, falls back to analytical estimates for uncovered
+kernels, and keeps measured GPU runtime for non-offloaded kernels.
 
 ## Candidate Backends
 
@@ -48,5 +49,6 @@ kernels.
 - CMU-SAFARI/ramulator-pim: trace-driven Ramulator-based PIM infrastructure.
 - UPMEM SDK simulator: useful for functional UPMEM-style PIM programming.
 
-Initial integration should target one simple streaming workload first, such as
-`vector_add` or `saxpy`, before attempting graph or sparse workloads.
+Initial integration should target simple matched primitives first, such as
+`vector_add`/`saxpy` through ADD and `gemv` through GEMV, before attempting graph
+or sparse workloads.
