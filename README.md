@@ -265,7 +265,22 @@ Simulator CSV schema:
 kernel_name
 simulator
 simulated_pim_time_ms
+simulated_pim_cycles
+simulated_baseline_cycles
+simulated_speedup
+cycle_time_ns
 notes
+```
+
+`simulated_pim_time_ms` can be provided directly, or computed from `simulated_pim_cycles * cycle_time_ns / 1e6`.
+
+SAIT PIMSimulator logs can be converted with:
+
+```bash
+python3 scripts/parse_sait_pim_logs.py \
+  --log-dir ~/pim-tools/pim-results \
+  --output simulators/sait_pim_simulation.csv \
+  --cycle-time-ns 1.0
 ```
 
 예시:

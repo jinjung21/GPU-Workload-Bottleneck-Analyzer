@@ -60,6 +60,7 @@ def save_markdown_report(
     summary = build_summary_table(profile)
     baseline_section = _build_baseline_section(baseline_comparison)
     model_section = _build_model_comparison_section(model_comparison, model_metrics, model_figure_path, output.parent)
+    decision_section = _build_final_decision_section(model_comparison)
     end_to_end_section = _build_end_to_end_section(end_to_end, end_to_end_figure_path, output.parent)
     simulation_section = _build_simulation_section(simulation_summary)
     exceeded = profile[profile["exceeds_roofline"]]
@@ -96,6 +97,7 @@ def save_markdown_report(
         "",
         *baseline_section,
         *model_section,
+        *decision_section,
         *simulation_section,
         *end_to_end_section,
         "## Notes",
@@ -191,6 +193,45 @@ def _build_model_comparison_section(
     ]
 
 
+def _build_final_decision_section(model_comparison: pd.DataFrame | None) -> list[str]:
+    if model_comparison is None or model_comparison.empty:
+        return []
+    if "feature_cost_v4" not in set(model_comparison["model"]):
+        return []
+
+    decision = model_comparison[model_comparison["model"] == "feature_cost_v4"].copy()
+    decision["final_decision"] = decision["predicted_candidate"].map(
+        lambda value: "PIM/NMP" if bool(value) else "GPU"
+    )
+    decision["simulated_pim_time_ms"] = decision.get("simulated_pim_time_ms", pd.NA)
+    decision["simulated_speedup"] = decision.get("simulated_speedup", pd.NA)
+    decision["simulated_pim_cycles"] = decision.get("simulated_pim_cycles", pd.NA)
+    decision["estimated_speedup"] = decision["estimated_speedup"].map(lambda value: f"{float(value):.2f}x")
+    decision["estimated_pim_time_ms"] = decision["estimated_pim_time_ms"].map(lambda value: f"{float(value):.3f}")
+    decision["simulated_pim_time_ms"] = decision["simulated_pim_time_ms"].map(_format_optional_ms)
+    decision["simulated_speedup"] = decision["simulated_speedup"].map(_format_optional_speedup)
+    decision["simulated_pim_cycles"] = decision["simulated_pim_cycles"].map(_format_optional_int)
+    columns = [
+        "benchmark",
+        "final_decision",
+        "estimated_speedup",
+        "estimated_pim_time_ms",
+        "simulated_pim_time_ms",
+        "simulated_pim_cycles",
+        "simulated_speedup",
+        "risk",
+    ]
+
+    return [
+        "## Final Offload Decision",
+        "",
+        "The final decision uses `feature_cost_v4`, which is the current reuse-aware policy model.",
+        "",
+        decision[columns].to_markdown(index=False),
+        "",
+    ]
+
+
 def _build_end_to_end_section(
     end_to_end: pd.DataFrame | None,
     figure_path: str | Path | None,
@@ -250,3 +291,15 @@ def _relative_link(target: Path, base_dir: Path) -> str:
         import os
 
         return os.path.relpath(target.resolve(), base_dir.resolve()).replace("\\", "/")
+
+
+def _format_optional_ms(value: object) -> str:
+    return "" if pd.isna(value) else f"{float(value):.6f}"
+
+
+def _format_optional_speedup(value: object) -> str:
+    return "" if pd.isna(value) else f"{float(value):.2f}x"
+
+
+def _format_optional_int(value: object) -> str:
+    return "" if pd.isna(value) else f"{int(float(value))}"

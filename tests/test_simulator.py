@@ -25,6 +25,24 @@ def test_load_pim_simulation_csv_validates_schema(tmp_path: Path) -> None:
     assert simulation.loc[0, "normalized_kernel"] == "vector_add"
 
 
+def test_load_pim_simulation_csv_can_compute_time_from_cycles(tmp_path: Path) -> None:
+    path = tmp_path / "sim.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "kernel_name,simulator,simulated_pim_cycles,simulated_baseline_cycles,cycle_time_ns",
+                "gemv,test_sim,13166,36082,1.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    simulation = load_pim_simulation_csv(path)
+
+    assert simulation.loc[0, "simulated_pim_time_ms"] == 0.013166
+    assert round(simulation.loc[0, "simulated_speedup"], 5) == 2.74054
+
+
 def test_load_pim_simulation_csv_rejects_nonpositive_time(tmp_path: Path) -> None:
     path = tmp_path / "sim.csv"
     path.write_text(
@@ -54,6 +72,10 @@ def test_attach_simulation_results_and_summary() -> None:
             "kernel_name": ["vector_add"],
             "simulator": ["test_sim"],
             "simulated_pim_time_ms": [0.05],
+            "simulated_pim_cycles": [3349],
+            "simulated_baseline_cycles": [6651],
+            "simulated_speedup": [1.98597],
+            "cycle_time_ns": [1.0],
             "notes": ["unit test"],
             "normalized_kernel": ["vector_add"],
         }
@@ -63,6 +85,8 @@ def test_attach_simulation_results_and_summary() -> None:
     summary = summarize_simulation_coverage(attached)
 
     assert attached.loc[0, "simulated_pim_time_ms"] == 0.05
+    assert attached.loc[0, "simulated_pim_cycles"] == 3349
+    assert attached.loc[0, "simulated_speedup"] == 1.98597
     assert pd.isna(attached.loc[1, "simulated_pim_time_ms"])
     assert summary["simulated"] == 1
     assert summary["benchmarks"] == 2

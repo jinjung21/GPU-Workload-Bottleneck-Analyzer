@@ -14,16 +14,31 @@ Convert simulator output into this CSV schema before passing it to `main.py`:
 kernel_name
 simulator
 simulated_pim_time_ms
+simulated_pim_cycles
+simulated_baseline_cycles
+simulated_speedup
+cycle_time_ns
 notes
 ```
+
+`simulated_pim_time_ms` can be provided directly. If it is omitted, the analyzer
+computes it from `simulated_pim_cycles * cycle_time_ns / 1e6`.
 
 Example:
 
 ```csv
-kernel_name,simulator,simulated_pim_time_ms,notes
-vector_add,SAIT-PIMSimulator,0.050,prototype adapter output
-saxpy,SAIT-PIMSimulator,0.060,prototype adapter output
-gemv,SAIT-PIMSimulator,0.013166,PIMBenchFixture.gemv cycle=13166 with temporary 1ns/cycle conversion
+kernel_name,simulator,simulated_pim_cycles,simulated_baseline_cycles,simulated_speedup,cycle_time_ns,notes
+vector_add,SAIT-PIMSimulator,3349,6651,1.98597,1.0,PIMBenchFixture.add
+gemv,SAIT-PIMSimulator,13166,36082,2.74054,1.0,PIMBenchFixture.gemv
+```
+
+SAIT PIMSimulator logs can be converted with:
+
+```bash
+python3 scripts/parse_sait_pim_logs.py \
+  --log-dir ~/pim-tools/pim-results \
+  --output simulators/sait_pim_simulation.csv \
+  --cycle-time-ns 1.0
 ```
 
 Run the analyzer with simulated PIM timing:

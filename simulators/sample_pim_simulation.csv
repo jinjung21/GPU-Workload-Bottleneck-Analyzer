@@ -1,9 +1,9 @@
-kernel_name,simulator,simulated_pim_time_ms,notes
-vector_add,example_pim_simulator,0.050,Example only; replace with real simulator output.
-saxpy,example_pim_simulator,0.060,Example only; replace with real simulator output.
-random_gather,example_pim_simulator,0.700,Example only; replace with real simulator output.
-reduction,example_pim_simulator,0.080,Example only; replace with real simulator output.
-matrix_transpose,example_pim_simulator,0.090,Example only; replace with real simulator output.
-gemv,example_pim_simulator,0.013166,Example only; maps to PIMBenchFixture.gemv cycle=13166 under temporary 1ns/cycle conversion.
-matrix_mul_tiled,example_pim_simulator,2.500,Example only; high-reuse GEMM should be replaced with real simulator output.
-cublas_sgemm,example_pim_simulator,6.000,Example only; replace with real simulator output.
+kernel_name,simulator,simulated_pim_time_ms,simulated_pim_cycles,simulated_baseline_cycles,simulated_speedup,cycle_time_ns,notes
+vector_add,example_pim_simulator,0.003349,3349,6651,1.98597,1.0,Example only; maps to PIMBenchFixture.add under temporary 1ns/cycle conversion.
+saxpy,example_pim_simulator,0.003349,3349,6651,1.98597,1.0,Example only; ADD proxy under temporary 1ns/cycle conversion.
+random_gather,example_pim_simulator,0.700000,,,,,Example only; replace with real simulator output.
+reduction,example_pim_simulator,0.003349,3349,6651,1.98597,1.0,Example only; ADD proxy under temporary 1ns/cycle conversion.
+matrix_transpose,example_pim_simulator,0.090000,,,,,Example only; replace with real simulator output.
+gemv,example_pim_simulator,0.013166,13166,36082,2.74054,1.0,Example only; maps to PIMBenchFixture.gemv under temporary 1ns/cycle conversion.
+matrix_mul_tiled,example_pim_simulator,2.500000,,,,,Example only; high-reuse GEMM should be replaced with real simulator output.
+cublas_sgemm,example_pim_simulator,6.000000,,,,,Example only; replace with real simulator output.

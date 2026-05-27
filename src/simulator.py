@@ -8,7 +8,6 @@ import pandas as pd
 SIMULATION_REQUIRED_COLUMNS = {
     "kernel_name",
     "simulator",
-    "simulated_pim_time_ms",
 }
 
 
@@ -31,12 +30,35 @@ def load_pim_simulation_csv(path: str | Path) -> pd.DataFrame:
         raise ValueError(f"Missing required columns in {simulation_path}: {missing_text}")
 
     simulation = simulation.copy()
-    simulation["simulated_pim_time_ms"] = pd.to_numeric(
-        simulation["simulated_pim_time_ms"],
-        errors="raise",
-    )
-    if (simulation["simulated_pim_time_ms"] <= 0).any():
+    _normalize_optional_numeric(simulation, "simulated_pim_cycles")
+    _normalize_optional_numeric(simulation, "simulated_baseline_cycles")
+    _normalize_optional_numeric(simulation, "simulated_speedup")
+    _normalize_optional_numeric(simulation, "cycle_time_ns")
+    if "cycle_time_ns" not in simulation.columns:
+        simulation["cycle_time_ns"] = pd.NA
+
+    if "simulated_pim_time_ms" in simulation.columns:
+        simulation["simulated_pim_time_ms"] = pd.to_numeric(
+            simulation["simulated_pim_time_ms"],
+            errors="raise",
+        )
+    elif {"simulated_pim_cycles", "cycle_time_ns"} <= set(simulation.columns):
+        simulation["simulated_pim_time_ms"] = simulation["simulated_pim_cycles"] * simulation["cycle_time_ns"] / 1e6
+    else:
+        raise ValueError(
+            "PIM simulation CSV requires simulated_pim_time_ms, or simulated_pim_cycles plus cycle_time_ns"
+        )
+
+    if simulation["simulated_pim_time_ms"].isna().any() or (simulation["simulated_pim_time_ms"] <= 0).any():
         raise ValueError("simulated_pim_time_ms must be positive for all simulator rows")
+    if "simulated_speedup" not in simulation.columns:
+        simulation["simulated_speedup"] = pd.NA
+    if simulation["simulated_speedup"].isna().any() and {"simulated_baseline_cycles", "simulated_pim_cycles"} <= set(simulation.columns):
+        missing_speedup = simulation["simulated_speedup"].isna()
+        simulation.loc[missing_speedup, "simulated_speedup"] = (
+            simulation.loc[missing_speedup, "simulated_baseline_cycles"]
+            / simulation.loc[missing_speedup, "simulated_pim_cycles"]
+        )
     if "notes" not in simulation.columns:
         simulation["notes"] = ""
     simulation["normalized_kernel"] = simulation["kernel_name"].map(_normalize_name)
@@ -48,6 +70,10 @@ def attach_simulation_results(model_comparison: pd.DataFrame, simulation: pd.Dat
 
     result = model_comparison.copy()
     result["simulated_pim_time_ms"] = pd.NA
+    result["simulated_pim_cycles"] = pd.NA
+    result["simulated_baseline_cycles"] = pd.NA
+    result["simulated_speedup"] = pd.NA
+    result["cycle_time_ns"] = pd.NA
     result["simulator"] = ""
     result["simulation_notes"] = ""
     if simulation is None:
@@ -55,20 +81,36 @@ def attach_simulation_results(model_comparison: pd.DataFrame, simulation: pd.Dat
 
     sim_by_name = simulation.set_index("normalized_kernel").to_dict(orient="index")
     simulated_times = []
+    simulated_pim_cycles = []
+    simulated_baseline_cycles = []
+    simulated_speedups = []
+    cycle_times = []
     simulator_names = []
     simulation_notes = []
     for benchmark in result["benchmark"]:
         matched = sim_by_name.get(_normalize_name(benchmark))
         if matched is None:
             simulated_times.append(pd.NA)
+            simulated_pim_cycles.append(pd.NA)
+            simulated_baseline_cycles.append(pd.NA)
+            simulated_speedups.append(pd.NA)
+            cycle_times.append(pd.NA)
             simulator_names.append("")
             simulation_notes.append("")
             continue
         simulated_times.append(float(matched["simulated_pim_time_ms"]))
+        simulated_pim_cycles.append(matched.get("simulated_pim_cycles", pd.NA))
+        simulated_baseline_cycles.append(matched.get("simulated_baseline_cycles", pd.NA))
+        simulated_speedups.append(matched.get("simulated_speedup", pd.NA))
+        cycle_times.append(matched.get("cycle_time_ns", pd.NA))
         simulator_names.append(str(matched["simulator"]))
         simulation_notes.append(str(matched.get("notes", "")))
 
     result["simulated_pim_time_ms"] = simulated_times
+    result["simulated_pim_cycles"] = simulated_pim_cycles
+    result["simulated_baseline_cycles"] = simulated_baseline_cycles
+    result["simulated_speedup"] = simulated_speedups
+    result["cycle_time_ns"] = cycle_times
     result["simulator"] = simulator_names
     result["simulation_notes"] = simulation_notes
     return result
@@ -91,3 +133,8 @@ def summarize_simulation_coverage(model_comparison: pd.DataFrame) -> dict[str, i
 
 def _normalize_name(value: object) -> str:
     return str(value).strip().lower().replace("-", "_")
+
+
+def _normalize_optional_numeric(frame: pd.DataFrame, column: str) -> None:
+    if column in frame.columns:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
