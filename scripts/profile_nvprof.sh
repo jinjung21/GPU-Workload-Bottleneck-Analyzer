@@ -18,6 +18,7 @@ benchmarks=(
   saxpy
   random_gather
   reduction
+  scan
   matrix_transpose
   gemv
   matrix_mul_tiled

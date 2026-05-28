@@ -221,6 +221,7 @@ vector_add        : streaming memory-bound
 saxpy             : streaming vector update
 random_gather     : irregular memory / latency-bound
 reduction         : bandwidth-sensitive parallel primitive
+scan              : block-local prefix sum primitive
 matrix_transpose  : data-layout transformation dominated by memory movement
 gemv              : matrix-vector multiplication; matches SAIT PIMSimulator GEMV primitive
 matrix_mul_tiled  : initial GEMM baseline; not yet a strong compute-bound reference
@@ -235,6 +236,7 @@ profiles/vector_add_nvprof.log
 profiles/saxpy_nvprof.log
 profiles/random_gather_nvprof.log
 profiles/reduction_nvprof.log
+profiles/scan_nvprof.log
 profiles/matrix_transpose_nvprof.log
 profiles/gemv_nvprof.log
 profiles/matrix_mul_tiled_nvprof.log
