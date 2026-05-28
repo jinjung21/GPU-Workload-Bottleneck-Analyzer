@@ -61,6 +61,7 @@ def save_markdown_report(
     baseline_section = _build_baseline_section(baseline_comparison)
     model_section = _build_model_comparison_section(model_comparison, model_metrics, model_figure_path, output.parent)
     decision_section = _build_final_decision_section(model_comparison)
+    calibration_section = _build_calibration_control_section(model_comparison)
     end_to_end_section = _build_end_to_end_section(end_to_end, end_to_end_figure_path, output.parent)
     simulation_section = _build_simulation_section(simulation_summary)
     exceeded = profile[profile["exceeds_roofline"]]
@@ -98,6 +99,7 @@ def save_markdown_report(
         *baseline_section,
         *model_section,
         *decision_section,
+        *calibration_section,
         *simulation_section,
         *end_to_end_section,
         "## Notes",
@@ -232,6 +234,51 @@ def _build_final_decision_section(model_comparison: pd.DataFrame | None) -> list
     ]
 
 
+def _build_calibration_control_section(model_comparison: pd.DataFrame | None) -> list[str]:
+    if model_comparison is None or model_comparison.empty:
+        return []
+    if "feature_cost_v4" not in set(model_comparison["model"]):
+        return []
+
+    decision = model_comparison[model_comparison["model"] == "feature_cost_v4"].copy()
+    decision["normalized"] = decision["benchmark"].map(lambda value: str(value).strip().lower())
+    controls = decision[decision["normalized"].isin({"gemv", "matrix_mul_tiled", "cublas_sgemm"})].copy()
+    if controls.empty:
+        return []
+
+    controls["expected_role"] = controls["normalized"].map(
+        {
+            "gemv": "PIM-positive control",
+            "matrix_mul_tiled": "GPU/high-reuse negative control",
+            "cublas_sgemm": "GPU/optimized-compute negative control",
+        }
+    )
+    controls["final_decision"] = controls["predicted_candidate"].map(
+        lambda value: "PIM/NMP" if bool(value) else "GPU"
+    )
+    controls["calibration_result"] = controls.apply(_calibration_result, axis=1)
+    controls["simulated_speedup"] = controls.get("simulated_speedup", pd.NA).map(_format_optional_speedup)
+    controls["estimated_speedup"] = controls["estimated_speedup"].map(lambda value: f"{float(value):.2f}x")
+    columns = [
+        "benchmark",
+        "expected_role",
+        "final_decision",
+        "estimated_speedup",
+        "simulated_speedup",
+        "risk",
+        "calibration_result",
+    ]
+
+    return [
+        "## Calibration Controls",
+        "",
+        "These workloads check whether the model separates PIM-friendly GEMV-style work from high-reuse GPU-friendly GEMM-style work.",
+        "",
+        controls[columns].to_markdown(index=False),
+        "",
+    ]
+
+
 def _build_end_to_end_section(
     end_to_end: pd.DataFrame | None,
     figure_path: str | Path | None,
@@ -303,3 +350,13 @@ def _format_optional_speedup(value: object) -> str:
 
 def _format_optional_int(value: object) -> str:
     return "" if pd.isna(value) else f"{int(float(value))}"
+
+
+def _calibration_result(row: pd.Series) -> str:
+    benchmark = str(row["normalized"])
+    predicted = bool(row["predicted_candidate"])
+    if benchmark == "gemv":
+        return "pass" if predicted else "check"
+    if benchmark in {"matrix_mul_tiled", "cublas_sgemm"}:
+        return "pass" if not predicted else "check"
+    return ""

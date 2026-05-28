@@ -298,6 +298,21 @@ python3 main.py \
 
 `--pim-simulation`을 사용하면 end-to-end policy estimate에서 offload된 kernel은 simulated PIM runtime을 우선 사용합니다. Simulator coverage가 없는 kernel은 analytical estimate로 fallback하고, GPU에 남긴 kernel은 measured GPU runtime을 그대로 사용합니다.
 
+서버 결과를 로컬 Mac으로 가져올 때는 프로젝트 루트에서 다음 helper를 사용할 수 있습니다.
+
+```bash
+bash scripts/fetch_server_results.sh gpu_profile_with_sait_pim
+```
+
+직접 `scp`를 쓰려면:
+
+```bash
+scp -r intern_euijin@165.132.112.154:~/GPU-Workload-Bottleneck-Analyzer/outputs/gpu_profile_with_sait_pim ./outputs/
+scp intern_euijin@165.132.112.154:~/GPU-Workload-Bottleneck-Analyzer/profiles/gpu_profile.csv ./profiles/
+scp intern_euijin@165.132.112.154:~/GPU-Workload-Bottleneck-Analyzer/simulators/sait_pim_simulation.csv ./simulators/
+scp -r intern_euijin@165.132.112.154:~/pim-tools/pim-results ./simulators/
+```
+
 ## Cache Metrics
 
 Cache behavior is important for distinguishing true DRAM bandwidth bottlenecks from cache locality or latency problems. The current server blocks Nsight Compute performance counters, so the analyzer cannot yet ingest L1/L2 hit rates, memory transactions, occupancy, or warp divergence.
