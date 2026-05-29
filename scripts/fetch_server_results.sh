@@ -14,6 +14,10 @@ scp -r "$SERVER:$REMOTE_REPO/outputs/$OUTPUT_NAME" ./outputs/
 echo "Fetching GPU profile CSV"
 scp "$SERVER:$REMOTE_REPO/profiles/gpu_profile.csv" ./profiles/
 
+echo "Fetching Nsight Compute metrics if present"
+scp "$SERVER:$REMOTE_REPO/profiles/ncu_metrics.csv" ./profiles/ || true
+scp -r "$SERVER:$REMOTE_REPO/profiles/ncu" ./profiles/ || true
+
 echo "Fetching SAIT PIM simulation CSV if present"
 scp "$SERVER:$REMOTE_REPO/simulators/sait_pim_simulation.csv" ./simulators/ || true
 

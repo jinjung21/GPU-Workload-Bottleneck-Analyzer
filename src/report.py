@@ -62,6 +62,7 @@ def save_markdown_report(
     model_section = _build_model_comparison_section(model_comparison, model_metrics, model_figure_path, output.parent)
     decision_section = _build_final_decision_section(model_comparison)
     calibration_section = _build_calibration_control_section(model_comparison)
+    ncu_section = _build_ncu_section(profile)
     end_to_end_section = _build_end_to_end_section(end_to_end, end_to_end_figure_path, output.parent)
     simulation_section = _build_simulation_section(simulation_summary)
     exceeded = profile[profile["exceeds_roofline"]]
@@ -96,6 +97,7 @@ def save_markdown_report(
         "",
         summary.to_markdown(index=False),
         "",
+        *ncu_section,
         *baseline_section,
         *model_section,
         *decision_section,
@@ -106,7 +108,7 @@ def save_markdown_report(
         "",
         "- Reports can be generated from proxy CSVs or CUDA benchmark profile CSVs.",
         "- PIM/NMP suitability still includes heuristic components that require calibration.",
-        "- Nsight Compute counter-based parsing can be added when performance counter permissions are available.",
+        "- Nsight Compute metrics are included when `--ncu-metrics` is provided.",
         "- Paper baseline comparison checks workload-category alignment, not measured PIM speedup.",
         "- Analytical PIM and end-to-end speedup estimates are model outputs, not hardware measurements.",
         "",
@@ -155,7 +157,7 @@ def _build_model_comparison_section(
         return []
 
     models = set(model_comparison["model"])
-    speedup_model = "feature_cost_v4" if "feature_cost_v4" in models else "feature_cost_v3"
+    speedup_model = "feature_cost_v5" if "feature_cost_v5" in models else "feature_cost_v4" if "feature_cost_v4" in models else "feature_cost_v3"
     if speedup_model not in models:
         speedup_model = "analytical_v2"
     speedup = model_comparison[model_comparison["model"] == speedup_model].copy()
@@ -198,10 +200,12 @@ def _build_model_comparison_section(
 def _build_final_decision_section(model_comparison: pd.DataFrame | None) -> list[str]:
     if model_comparison is None or model_comparison.empty:
         return []
-    if "feature_cost_v4" not in set(model_comparison["model"]):
+    models = set(model_comparison["model"])
+    decision_model = "feature_cost_v5" if "feature_cost_v5" in models else "feature_cost_v4" if "feature_cost_v4" in models else None
+    if decision_model is None:
         return []
 
-    decision = model_comparison[model_comparison["model"] == "feature_cost_v4"].copy()
+    decision = model_comparison[model_comparison["model"] == decision_model].copy()
     decision["final_decision"] = decision["predicted_candidate"].map(
         lambda value: "PIM/NMP" if bool(value) else "GPU"
     )
@@ -227,7 +231,7 @@ def _build_final_decision_section(model_comparison: pd.DataFrame | None) -> list
     return [
         "## Final Offload Decision",
         "",
-        "The final decision uses `feature_cost_v4`, which is the current reuse-aware policy model.",
+        f"The final decision uses `{decision_model}`, which is the current policy model.",
         "",
         decision[columns].to_markdown(index=False),
         "",
@@ -237,10 +241,12 @@ def _build_final_decision_section(model_comparison: pd.DataFrame | None) -> list
 def _build_calibration_control_section(model_comparison: pd.DataFrame | None) -> list[str]:
     if model_comparison is None or model_comparison.empty:
         return []
-    if "feature_cost_v4" not in set(model_comparison["model"]):
+    models = set(model_comparison["model"])
+    decision_model = "feature_cost_v5" if "feature_cost_v5" in models else "feature_cost_v4" if "feature_cost_v4" in models else None
+    if decision_model is None:
         return []
 
-    decision = model_comparison[model_comparison["model"] == "feature_cost_v4"].copy()
+    decision = model_comparison[model_comparison["model"] == decision_model].copy()
     decision["normalized"] = decision["benchmark"].map(lambda value: str(value).strip().lower())
     controls = decision[decision["normalized"].isin({"gemv", "matrix_mul_tiled", "cublas_sgemm"})].copy()
     if controls.empty:
@@ -275,6 +281,46 @@ def _build_calibration_control_section(model_comparison: pd.DataFrame | None) ->
         "These workloads check whether the model separates PIM-friendly GEMV-style work from high-reuse GPU-friendly GEMM-style work.",
         "",
         controls[columns].to_markdown(index=False),
+        "",
+    ]
+
+
+def _build_ncu_section(profile: pd.DataFrame) -> list[str]:
+    ncu_columns = [
+        "ncu_sol_dram_pct",
+        "ncu_sol_l2_pct",
+        "ncu_sol_l1_tex_pct",
+        "ncu_sm_util_pct",
+        "ncu_achieved_occupancy_pct",
+        "ncu_duration_us",
+    ]
+    if not any(column in profile.columns for column in ncu_columns):
+        return []
+
+    available = profile[[column for column in ncu_columns if column in profile.columns]]
+    if available.dropna(how="all").empty:
+        return []
+
+    table = pd.DataFrame({"kernel": profile["kernel_name"]})
+    if "ncu_sol_dram_pct" in profile.columns:
+        table["SOL_DRAM"] = profile["ncu_sol_dram_pct"].map(_format_optional_pct)
+    if "ncu_sol_l2_pct" in profile.columns:
+        table["SOL_L2"] = profile["ncu_sol_l2_pct"].map(_format_optional_pct)
+    if "ncu_sol_l1_tex_pct" in profile.columns:
+        table["SOL_L1_TEX"] = profile["ncu_sol_l1_tex_pct"].map(_format_optional_pct)
+    if "ncu_sm_util_pct" in profile.columns:
+        table["SM"] = profile["ncu_sm_util_pct"].map(_format_optional_pct)
+    if "ncu_achieved_occupancy_pct" in profile.columns:
+        table["occupancy"] = profile["ncu_achieved_occupancy_pct"].map(_format_optional_pct)
+    if "ncu_duration_us" in profile.columns:
+        table["duration_us"] = profile["ncu_duration_us"].map(_format_optional_float)
+
+    return [
+        "## Nsight Compute Metrics",
+        "",
+        "These counters come from Nsight Compute and are used by `feature_cost_v5` when `--ncu-metrics` is provided.",
+        "",
+        table.to_markdown(index=False),
         "",
     ]
 
@@ -350,6 +396,14 @@ def _format_optional_speedup(value: object) -> str:
 
 def _format_optional_int(value: object) -> str:
     return "" if pd.isna(value) else f"{int(float(value))}"
+
+
+def _format_optional_pct(value: object) -> str:
+    return "" if pd.isna(value) else f"{float(value):.2f}%"
+
+
+def _format_optional_float(value: object) -> str:
+    return "" if pd.isna(value) else f"{float(value):.3f}"
 
 
 def _calibration_result(row: pd.Series) -> str:

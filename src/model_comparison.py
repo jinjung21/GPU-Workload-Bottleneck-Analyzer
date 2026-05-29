@@ -7,6 +7,7 @@ import pandas as pd
 from .config import HardwareConfig
 from .cost_model_v3 import estimate_feature_cost_v3
 from .cost_model_v4 import estimate_feature_cost_v4
+from .cost_model_v5 import estimate_feature_cost_v5
 
 
 @dataclass(frozen=True)
@@ -47,9 +48,13 @@ def build_model_comparison(
         predictions["feature_cost_v3"] = bool(feature_cost["predicted_candidate"])
         feature_cost_v4 = estimate_feature_cost_v4(matched, hardware, expected)
         predictions["feature_cost_v4"] = bool(feature_cost_v4["predicted_candidate"])
+        feature_cost_v5 = None
+        if _has_ncu_metrics(matched):
+            feature_cost_v5 = estimate_feature_cost_v5(matched, hardware, expected)
+            predictions["feature_cost_v5"] = bool(feature_cost_v5["predicted_candidate"])
 
         for model_name, predicted in predictions.items():
-            estimate = _model_estimate(model_name, analytical, feature_cost, feature_cost_v4)
+            estimate = _model_estimate(model_name, analytical, feature_cost, feature_cost_v4, feature_cost_v5)
             rows.append(
                 {
                     "model": model_name,
@@ -130,6 +135,7 @@ def _model_estimate(
     analytical: dict[str, float | str],
     feature_cost: dict[str, float | str | bool],
     feature_cost_v4: dict[str, float | str | bool],
+    feature_cost_v5: dict[str, float | str | bool] | None,
 ) -> dict[str, object]:
     if model_name == "analytical_v2":
         return {
@@ -151,6 +157,13 @@ def _model_estimate(
             "estimated_pim_time_ms": feature_cost_v4["estimated_pim_time_ms"],
             "risk": feature_cost_v4["risk"],
             "feature_summary": feature_cost_v4["feature_summary"],
+        }
+    if model_name == "feature_cost_v5" and feature_cost_v5 is not None:
+        return {
+            "estimated_speedup": feature_cost_v5["estimated_speedup"],
+            "estimated_pim_time_ms": feature_cost_v5["estimated_pim_time_ms"],
+            "risk": feature_cost_v5["risk"],
+            "feature_summary": feature_cost_v5["feature_summary"],
         }
     return {
         "estimated_speedup": "",
@@ -229,6 +242,10 @@ def _find_profile_row(profile_by_name: dict[str, pd.Series], benchmark: str, ali
 
 def _normalize_name(value: object) -> str:
     return str(value).strip().lower().replace("-", "_")
+
+
+def _has_ncu_metrics(row: pd.Series) -> bool:
+    return any(pd.notna(row.get(column)) for column in ["ncu_sol_dram_pct", "ncu_memory_util_pct", "ncu_sm_util_pct"])
 
 
 def _safe_div(numerator: float, denominator: float) -> float:
