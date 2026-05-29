@@ -42,8 +42,7 @@ for benchmark in "${benchmarks[@]}"; do
     --target-processes all \
     --launch-skip "$LAUNCH_SKIP" \
     --launch-count "$LAUNCH_COUNT" \
-    --log-file "$log" \
-    "$exe" > /dev/null
+    "$exe" > "$log"
 done
 
 echo "Wrote Nsight Compute reports: $OUT_DIR/*_ncu.txt"
