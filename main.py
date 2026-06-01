@@ -58,7 +58,11 @@ def main() -> None:
         simulation_summary = summarize_simulation_coverage(model_comparison)
         runtime_source = "simulated" if simulation is not None else "estimated"
         end_to_end_cost_model = (
-            "feature_cost_v5" if "feature_cost_v5" in set(model_comparison["model"]) else "feature_cost_v4"
+            "feature_cost_v6"
+            if "feature_cost_v6" in set(model_comparison["model"])
+            else "feature_cost_v5"
+            if "feature_cost_v5" in set(model_comparison["model"])
+            else "feature_cost_v4"
         )
         end_to_end = build_end_to_end_evaluation(
             model_comparison,

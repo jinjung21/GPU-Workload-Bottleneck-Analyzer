@@ -6,6 +6,7 @@ NCU="${NCU:-$CUDA_HOME/bin/ncu}"
 OUT_DIR="${OUT_DIR:-profiles/ncu}"
 LAUNCH_SKIP="${LAUNCH_SKIP:-1}"
 LAUNCH_COUNT="${LAUNCH_COUNT:-1}"
+NCU_EXTRA_ARGS="${NCU_EXTRA_ARGS:-}"
 
 mkdir -p "$OUT_DIR"
 
@@ -38,10 +39,16 @@ for benchmark in "${benchmarks[@]}"; do
   exe="build/$benchmark"
   log="$OUT_DIR/${benchmark}_ncu.txt"
   echo "Profiling $benchmark with Nsight Compute"
+  extra_args=()
+  if [[ -n "$NCU_EXTRA_ARGS" ]]; then
+    # shellcheck disable=SC2206
+    extra_args=($NCU_EXTRA_ARGS)
+  fi
   "$NCU" \
     --target-processes all \
     --launch-skip "$LAUNCH_SKIP" \
     --launch-count "$LAUNCH_COUNT" \
+    "${extra_args[@]}" \
     "$exe" > "$log"
 done
 
@@ -49,3 +56,6 @@ echo "Wrote Nsight Compute reports: $OUT_DIR/*_ncu.txt"
 echo
 echo "Next command:"
 echo "python3 scripts/parse_ncu_reports.py --input-dir $OUT_DIR --output profiles/ncu_metrics.csv"
+echo
+echo "Optional detailed run example:"
+echo "NCU_EXTRA_ARGS=\"--section MemoryWorkloadAnalysis --section SchedulerStats --section WarpStateStats\" bash scripts/profile_ncu.sh"

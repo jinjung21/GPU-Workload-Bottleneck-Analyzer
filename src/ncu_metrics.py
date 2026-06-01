@@ -17,18 +17,59 @@ NCU_METRIC_COLUMNS = [
     "ncu_achieved_occupancy_pct",
     "ncu_active_warps_per_sm",
     "ncu_registers_per_thread",
+    "ncu_l1_hit_rate_pct",
+    "ncu_l2_hit_rate_pct",
+    "ncu_global_load_efficiency_pct",
+    "ncu_global_store_efficiency_pct",
+    "ncu_warp_execution_efficiency_pct",
+    "ncu_branch_efficiency_pct",
+    "ncu_issue_slot_util_pct",
+    "ncu_eligible_warps_per_scheduler",
+    "ncu_memory_stall_pct",
+    "ncu_barrier_stall_pct",
+    "ncu_long_scoreboard_stall_pct",
+    "ncu_short_scoreboard_stall_pct",
+    "ncu_dram_read_bytes",
+    "ncu_dram_write_bytes",
+    "ncu_l2_read_transactions",
+    "ncu_l2_write_transactions",
 ]
 
 _TEXT_METRICS = {
-    "ncu_duration_us": "Duration",
-    "ncu_memory_util_pct": "Memory [%]",
-    "ncu_sol_dram_pct": "SOL DRAM",
-    "ncu_sol_l1_tex_pct": "SOL L1/TEX Cache",
-    "ncu_sol_l2_pct": "SOL L2 Cache",
-    "ncu_sm_util_pct": "SM [%]",
-    "ncu_achieved_occupancy_pct": "Achieved Occupancy",
-    "ncu_active_warps_per_sm": "Achieved Active Warps Per SM",
-    "ncu_registers_per_thread": "Registers Per Thread",
+    "ncu_duration_us": ["Duration"],
+    "ncu_memory_util_pct": ["Memory [%]"],
+    "ncu_sol_dram_pct": ["SOL DRAM"],
+    "ncu_sol_l1_tex_pct": ["SOL L1/TEX Cache"],
+    "ncu_sol_l2_pct": ["SOL L2 Cache"],
+    "ncu_sm_util_pct": ["SM [%]"],
+    "ncu_achieved_occupancy_pct": ["Achieved Occupancy"],
+    "ncu_active_warps_per_sm": ["Achieved Active Warps Per SM"],
+    "ncu_registers_per_thread": ["Registers Per Thread"],
+    "ncu_l1_hit_rate_pct": ["L1/TEX Hit Rate", "L1 Hit Rate", "l1tex hit rate"],
+    "ncu_l2_hit_rate_pct": ["L2 Hit Rate", "lts hit rate"],
+    "ncu_global_load_efficiency_pct": ["Global Memory Load Efficiency", "Global Load Efficiency"],
+    "ncu_global_store_efficiency_pct": ["Global Memory Store Efficiency", "Global Store Efficiency"],
+    "ncu_warp_execution_efficiency_pct": ["Warp Execution Efficiency"],
+    "ncu_branch_efficiency_pct": ["Branch Efficiency"],
+    "ncu_issue_slot_util_pct": ["Issue Slots Busy", "Issue Slot Utilization"],
+    "ncu_eligible_warps_per_scheduler": ["Eligible Warps Per Scheduler"],
+    "ncu_memory_stall_pct": ["Stall Memory Dependency", "Stall Memory Throttle", "Memory Stall"],
+    "ncu_barrier_stall_pct": ["Stall Barrier", "Barrier Stall"],
+    "ncu_long_scoreboard_stall_pct": ["Stall Long Scoreboard", "Long Scoreboard"],
+    "ncu_short_scoreboard_stall_pct": ["Stall Short Scoreboard", "Short Scoreboard"],
+    "ncu_dram_read_bytes": ["DRAM Read Bytes", "dram bytes read"],
+    "ncu_dram_write_bytes": ["DRAM Write Bytes", "dram bytes write", "dram bytes written"],
+    "ncu_l2_read_transactions": ["L2 Read Transactions", "L2 Read Sectors"],
+    "ncu_l2_write_transactions": ["L2 Write Transactions", "L2 Write Sectors"],
+}
+
+_CSV_METRIC_ALIASES = {
+    "ncu_l1_hit_rate_pct": ["l1tex", "hit_rate"],
+    "ncu_l2_hit_rate_pct": ["lts", "hit_rate"],
+    "ncu_warp_execution_efficiency_pct": ["warp_execution_efficiency"],
+    "ncu_branch_efficiency_pct": ["branch_efficiency"],
+    "ncu_dram_read_bytes": ["dram", "bytes_read"],
+    "ncu_dram_write_bytes": ["dram", "bytes_write"],
 }
 
 
@@ -80,11 +121,11 @@ def parse_ncu_report_file(path: str | Path, kernel_name: str | None = None) -> d
 
 
 def _parse_text_metrics(text: str, row: dict[str, object]) -> None:
-    for column, label in _TEXT_METRICS.items():
+    for column, labels in _TEXT_METRICS.items():
         values = []
         for line in text.splitlines():
             stripped = line.strip()
-            if not stripped.startswith(label):
+            if not _starts_with_any_label(stripped, labels):
                 continue
             numeric_values = _numeric_values(stripped)
             if numeric_values:
@@ -95,11 +136,12 @@ def _parse_text_metrics(text: str, row: dict[str, object]) -> None:
 
 def _parse_csv_like_metrics(text: str, row: dict[str, object]) -> None:
     for fields in csv.reader(text.splitlines()):
-        if not fields:
+        if len(fields) < 2:
             continue
         joined = " ".join(field.strip() for field in fields)
-        for column, label in _TEXT_METRICS.items():
-            if label not in joined:
+        normalized = _normalize_metric_text(joined)
+        for column, labels in _TEXT_METRICS.items():
+            if not _matches_any_label(joined, labels) and not _matches_csv_alias(normalized, column):
                 continue
             numeric_values = _numeric_values(joined)
             if numeric_values:
@@ -108,6 +150,27 @@ def _parse_csv_like_metrics(text: str, row: dict[str, object]) -> None:
 
 def _numeric_values(text: str) -> list[float]:
     return [float(value) for value in re.findall(r"(?<![A-Za-z])-?\d+(?:\.\d+)?", text)]
+
+
+def _matches_any_label(text: str, labels: list[str]) -> bool:
+    normalized = _normalize_metric_text(text)
+    return any(_normalize_metric_text(label) in normalized for label in labels)
+
+
+def _starts_with_any_label(text: str, labels: list[str]) -> bool:
+    normalized = _normalize_metric_text(text)
+    return any(normalized.startswith(_normalize_metric_text(label)) for label in labels)
+
+
+def _matches_csv_alias(text: str, column: str) -> bool:
+    aliases = _CSV_METRIC_ALIASES.get(column)
+    if not aliases:
+        return False
+    return all(alias in text for alias in aliases)
+
+
+def _normalize_metric_text(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
 
 
 def _kernel_name_from_path(path: Path) -> str:

@@ -6,7 +6,7 @@ Roofline 모델을 기반으로 GPU kernel profiling 데이터를 분석해 memo
 
 - Proxy/profile CSV 분석: CUDA 없이 macOS나 일반 Linux 환경에서 분석 모델과 report pipeline을 검증합니다.
 - CUDA benchmark profiling: RTX 2080 Ti 서버에서 CUDA benchmark를 실행하고 실제 GPU runtime 기반 CSV를 생성합니다.
-- Nsight Compute counter profiling: NCU가 측정한 DRAM/SM/L1/L2/occupancy metric을 모델 feature로 사용합니다.
+- Nsight Compute counter profiling: NCU가 측정한 DRAM/SM/L1/L2/occupancy/cache/stall metric을 모델 feature로 사용합니다.
 
 ## Project Goal
 
@@ -94,7 +94,7 @@ estimated_pim_time =
 estimated_speedup = gpu_proxy_runtime / estimated_pim_time
 ```
 
-`feature_cost_v3`는 metadata label만으로 gate를 거는 대신, profile에서 얻은 numeric feature와 임시 paper metadata를 결합해 GPU/PIM cost를 비교합니다. `feature_cost_v4`는 여기에 data reuse proxy를 추가해서 cache/shared-memory reuse가 큰 dense compute kernel을 PIM 후보에서 더 강하게 제외합니다. `feature_cost_v5`는 Nsight Compute counter가 있을 때 실제 DRAM saturation, SM utilization, L1/L2 pressure, achieved occupancy를 사용해 v4 estimate를 보정합니다.
+`feature_cost_v3`는 metadata label만으로 gate를 거는 대신, profile에서 얻은 numeric feature와 임시 paper metadata를 결합해 GPU/PIM cost를 비교합니다. `feature_cost_v4`는 여기에 data reuse proxy를 추가해서 cache/shared-memory reuse가 큰 dense compute kernel을 PIM 후보에서 더 강하게 제외합니다. `feature_cost_v5`는 Nsight Compute counter가 있을 때 실제 DRAM saturation, SM utilization, L1/L2 pressure, achieved occupancy를 사용해 v4 estimate를 보정합니다. `feature_cost_v6`는 cache hit rate, memory efficiency, warp/branch efficiency, stall reason, transaction proxy까지 있으면 추가로 반영합니다.
 
 ```text
 memory_pressure
@@ -111,11 +111,20 @@ ncu_sm_util_pct
 ncu_sol_l1_tex_pct
 ncu_sol_l2_pct
 ncu_achieved_occupancy_pct
+ncu_l1_hit_rate_pct
+ncu_l2_hit_rate_pct
+ncu_global_load_efficiency_pct
+ncu_global_store_efficiency_pct
+ncu_warp_execution_efficiency_pct
+ncu_branch_efficiency_pct
+ncu_memory_stall_pct
+ncu_long_scoreboard_stall_pct
 ```
 
 이 모델은 `SORT`처럼 낮은 arithmetic intensity와 irregular access만 보면 좋아 보이지만 communication/host-transfer risk가 큰 workload를 false positive로 분류하지 않도록 설계되었습니다.
 `feature_cost_v4`는 `matrix_mul_tiled`처럼 bandwidth를 많이 쓰더라도 data reuse가 큰 GEMM 계열 workload를 naive PIM candidate로 보지 않도록 설계되었습니다.
 `feature_cost_v5`는 `vector_add`처럼 NCU에서 `SOL DRAM`이 높고 `SM [%]`가 낮게 나온 kernel을 실제 DRAM-bound로 더 강하게 확인하고, 반대로 SM/cache/reuse signal이 강한 kernel은 PIM 후보에서 더 보수적으로 처리합니다.
+`feature_cost_v6`는 cache hit가 높고 warp/control-flow risk가 큰 workload를 GPU-friendly로 더 보수적으로 보고, cache hit가 낮고 long scoreboard/memory stall이 높은 workload를 PIM/NMP opportunity로 더 강하게 봅니다.
 
 The report also includes an end-to-end policy estimate:
 
@@ -128,7 +137,7 @@ traffic-only offload policy
 vs.
 heuristic_v1
 vs.
-feature_cost_v4 / feature_cost_v5
+feature_cost_v4 / feature_cost_v5 / feature_cost_v6
 ```
 
 Each policy decides which kernels to offload. The runtime comparison then uses
@@ -281,6 +290,18 @@ LAUNCH_COUNT=1
 
 이유는 benchmark 코드가 안정적인 runtime을 얻기 위해 같은 kernel을 여러 번 반복 실행하기 때문입니다. NCU가 모든 launch를 profiling하면 너무 오래 걸리고 report가 과하게 커지므로, warm-up launch를 하나 건너뛰고 대표 launch 하나만 수집합니다.
 
+서버의 Nsight Compute가 어떤 상세 metric을 지원하는지 먼저 확인하려면:
+
+```bash
+bash scripts/query_ncu_metrics.sh
+```
+
+더 자세한 section을 시도하려면 다음처럼 환경변수로 추가합니다. 서버의 NCU 버전에 없는 section 이름이면 실패할 수 있으므로, 기본 run이 성공한 뒤에 시도합니다.
+
+```bash
+NCU_EXTRA_ARGS="--section MemoryWorkloadAnalysis --section SchedulerStats --section WarpStateStats" bash scripts/profile_ncu.sh
+```
+
 생성되는 analyzer CSV schema:
 
 ```text
@@ -294,6 +315,22 @@ ncu_sm_util_pct
 ncu_achieved_occupancy_pct
 ncu_active_warps_per_sm
 ncu_registers_per_thread
+ncu_l1_hit_rate_pct
+ncu_l2_hit_rate_pct
+ncu_global_load_efficiency_pct
+ncu_global_store_efficiency_pct
+ncu_warp_execution_efficiency_pct
+ncu_branch_efficiency_pct
+ncu_issue_slot_util_pct
+ncu_eligible_warps_per_scheduler
+ncu_memory_stall_pct
+ncu_barrier_stall_pct
+ncu_long_scoreboard_stall_pct
+ncu_short_scoreboard_stall_pct
+ncu_dram_read_bytes
+ncu_dram_write_bytes
+ncu_l2_read_transactions
+ncu_l2_write_transactions
 ```
 
 NCU metric까지 포함한 전체 분석은 다음처럼 실행합니다.
@@ -310,7 +347,7 @@ python3 main.py \
   --peak-memory-bandwidth 616000000000
 ```
 
-`--ncu-metrics`가 들어오면 report에 `Nsight Compute Metrics` 섹션이 추가되고, model comparison에는 `feature_cost_v5`가 포함됩니다. End-to-end estimate도 NCU 기반 `feature_cost_v5`를 공통 cost model로 사용합니다.
+`--ncu-metrics`가 들어오면 report에 `Nsight Compute Metrics` 섹션이 추가됩니다. 기본 NCU counter만 있으면 model comparison에 `feature_cost_v5`가 포함되고, cache/stall/warp counter까지 있으면 `feature_cost_v6`가 포함됩니다. End-to-end estimate도 가장 최신 feature-cost model을 공통 cost model로 사용합니다.
 
 ## PIM Simulator Integration
 
@@ -374,7 +411,7 @@ scp -r intern_euijin@165.132.112.154:~/pim-tools/pim-results ./simulators/
 
 ## Cache Metrics
 
-Cache behavior is important for distinguishing true DRAM bandwidth bottlenecks from cache locality or latency problems. With Nsight Compute permission enabled, the analyzer can ingest first-level counter signals such as DRAM/SM utilization and achieved occupancy.
+Cache behavior is important for distinguishing true DRAM bandwidth bottlenecks from cache locality or latency problems. With Nsight Compute permission enabled, the analyzer can ingest first-level counter signals such as DRAM/SM utilization and achieved occupancy, plus optional cache/stall/warp metrics when the server report includes them.
 
 Current handling:
 
@@ -386,14 +423,14 @@ Available now:
 - irregular vs regular access metadata
 - CUDA event runtime
 - Nsight Compute SOL DRAM / SM / L1-TEX / L2 / occupancy counters when NCU permission is enabled
+- Optional NCU cache hit, memory efficiency, warp/branch efficiency, stall, transaction proxy counters when present in reports
 
 Not available yet:
-- DRAM transaction count
-- warp execution efficiency
-- memory latency counters
+- calibrated thresholds from large benchmark sweeps
+- architecture-specific memory latency calibration
 ```
 
-When NCU counters are not provided, `feature_cost_v4` uses `data_reuse_potential` as a proxy for cache/shared-memory reuse. When NCU counters are provided, `feature_cost_v5` uses measured counter signals to calibrate that proxy.
+When NCU counters are not provided, `feature_cost_v4` uses `data_reuse_potential` as a proxy for cache/shared-memory reuse. When basic NCU counters are provided, `feature_cost_v5` uses measured counter signals to calibrate that proxy. When cache/stall counters are also present, `feature_cost_v6` further separates true DRAM/latency problems from GPU cache-locality advantages.
 
 ## Outputs
 
@@ -432,7 +469,7 @@ notes
 
 - 더 다양한 실제 GPU benchmark metadata와 size sweep 추가
 - Nsight Compute metric coverage 확대: memory transaction count, warp execution efficiency, stall reason
-- `feature_cost_v5` threshold를 더 많은 benchmark와 size sweep으로 calibration
+- `feature_cost_v6` threshold를 더 많은 benchmark와 size sweep으로 calibration
 - PIM/NMP model threshold와 risk parameter를 논문/실측 데이터 기반으로 calibration
 - SAIT PIMSimulator 또는 Ramulator-PIM adapter 추가
 - PrIM/UPMEM case study와 실제 RTX 2080 Ti profiling 결과 비교

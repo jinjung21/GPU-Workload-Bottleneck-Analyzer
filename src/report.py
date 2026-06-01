@@ -157,7 +157,15 @@ def _build_model_comparison_section(
         return []
 
     models = set(model_comparison["model"])
-    speedup_model = "feature_cost_v5" if "feature_cost_v5" in models else "feature_cost_v4" if "feature_cost_v4" in models else "feature_cost_v3"
+    speedup_model = (
+        "feature_cost_v6"
+        if "feature_cost_v6" in models
+        else "feature_cost_v5"
+        if "feature_cost_v5" in models
+        else "feature_cost_v4"
+        if "feature_cost_v4" in models
+        else "feature_cost_v3"
+    )
     if speedup_model not in models:
         speedup_model = "analytical_v2"
     speedup = model_comparison[model_comparison["model"] == speedup_model].copy()
@@ -201,7 +209,7 @@ def _build_final_decision_section(model_comparison: pd.DataFrame | None) -> list
     if model_comparison is None or model_comparison.empty:
         return []
     models = set(model_comparison["model"])
-    decision_model = "feature_cost_v5" if "feature_cost_v5" in models else "feature_cost_v4" if "feature_cost_v4" in models else None
+    decision_model = _current_feature_cost_model(models)
     if decision_model is None:
         return []
 
@@ -242,7 +250,7 @@ def _build_calibration_control_section(model_comparison: pd.DataFrame | None) ->
     if model_comparison is None or model_comparison.empty:
         return []
     models = set(model_comparison["model"])
-    decision_model = "feature_cost_v5" if "feature_cost_v5" in models else "feature_cost_v4" if "feature_cost_v4" in models else None
+    decision_model = _current_feature_cost_model(models)
     if decision_model is None:
         return []
 
@@ -293,6 +301,10 @@ def _build_ncu_section(profile: pd.DataFrame) -> list[str]:
         "ncu_sm_util_pct",
         "ncu_achieved_occupancy_pct",
         "ncu_duration_us",
+        "ncu_l1_hit_rate_pct",
+        "ncu_l2_hit_rate_pct",
+        "ncu_warp_execution_efficiency_pct",
+        "ncu_memory_stall_pct",
     ]
     if not any(column in profile.columns for column in ncu_columns):
         return []
@@ -302,23 +314,31 @@ def _build_ncu_section(profile: pd.DataFrame) -> list[str]:
         return []
 
     table = pd.DataFrame({"kernel": profile["kernel_name"]})
-    if "ncu_sol_dram_pct" in profile.columns:
+    if _has_values(profile, "ncu_sol_dram_pct"):
         table["SOL_DRAM"] = profile["ncu_sol_dram_pct"].map(_format_optional_pct)
-    if "ncu_sol_l2_pct" in profile.columns:
+    if _has_values(profile, "ncu_sol_l2_pct"):
         table["SOL_L2"] = profile["ncu_sol_l2_pct"].map(_format_optional_pct)
-    if "ncu_sol_l1_tex_pct" in profile.columns:
+    if _has_values(profile, "ncu_sol_l1_tex_pct"):
         table["SOL_L1_TEX"] = profile["ncu_sol_l1_tex_pct"].map(_format_optional_pct)
-    if "ncu_sm_util_pct" in profile.columns:
+    if _has_values(profile, "ncu_sm_util_pct"):
         table["SM"] = profile["ncu_sm_util_pct"].map(_format_optional_pct)
-    if "ncu_achieved_occupancy_pct" in profile.columns:
+    if _has_values(profile, "ncu_achieved_occupancy_pct"):
         table["occupancy"] = profile["ncu_achieved_occupancy_pct"].map(_format_optional_pct)
-    if "ncu_duration_us" in profile.columns:
+    if _has_values(profile, "ncu_duration_us"):
         table["duration_us"] = profile["ncu_duration_us"].map(_format_optional_float)
+    if _has_values(profile, "ncu_l1_hit_rate_pct"):
+        table["L1_hit"] = profile["ncu_l1_hit_rate_pct"].map(_format_optional_pct)
+    if _has_values(profile, "ncu_l2_hit_rate_pct"):
+        table["L2_hit"] = profile["ncu_l2_hit_rate_pct"].map(_format_optional_pct)
+    if _has_values(profile, "ncu_warp_execution_efficiency_pct"):
+        table["warp_eff"] = profile["ncu_warp_execution_efficiency_pct"].map(_format_optional_pct)
+    if _has_values(profile, "ncu_memory_stall_pct"):
+        table["memory_stall"] = profile["ncu_memory_stall_pct"].map(_format_optional_pct)
 
     return [
         "## Nsight Compute Metrics",
         "",
-        "These counters come from Nsight Compute and are used by `feature_cost_v5` when `--ncu-metrics` is provided.",
+        "These counters come from Nsight Compute and are used by `feature_cost_v5`/`feature_cost_v6` when `--ncu-metrics` is provided.",
         "",
         table.to_markdown(index=False),
         "",
@@ -384,6 +404,20 @@ def _relative_link(target: Path, base_dir: Path) -> str:
         import os
 
         return os.path.relpath(target.resolve(), base_dir.resolve()).replace("\\", "/")
+
+
+def _current_feature_cost_model(models: set[str]) -> str | None:
+    if "feature_cost_v6" in models:
+        return "feature_cost_v6"
+    if "feature_cost_v5" in models:
+        return "feature_cost_v5"
+    if "feature_cost_v4" in models:
+        return "feature_cost_v4"
+    return None
+
+
+def _has_values(frame: pd.DataFrame, column: str) -> bool:
+    return column in frame.columns and not frame[column].dropna().empty
 
 
 def _format_optional_ms(value: object) -> str:

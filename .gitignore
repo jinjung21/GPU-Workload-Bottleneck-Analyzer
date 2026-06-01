@@ -9,6 +9,7 @@ profiles/*.csv
 profiles/*.log
 profiles/*.qdrep
 profiles/*.sqlite
+profiles/ncu/
 simulators/*_pim_simulation.csv
 !simulators/sample_pim_simulation.csv
 simulators/pim-results/
