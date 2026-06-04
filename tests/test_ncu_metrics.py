@@ -15,6 +15,9 @@ def test_parse_ncu_text_report(tmp_path: Path) -> None:
         """
         Section: GPU Speed Of Light
         Memory [%]                                                                           %                          85.34
+        Memory Throughput                                                         Gbyte/second                         554.92
+        Mem Busy                                                                             %                          31.08
+        Max Bandwidth                                                                        %                          85.41
         SOL DRAM                                                                             %                          85.34
         SOL L1/TEX Cache                                                                     %                          16.39
         SOL L2 Cache                                                                         %                          31.08
@@ -27,6 +30,9 @@ def test_parse_ncu_text_report(tmp_path: Path) -> None:
         L2 Hit Rate                                                                          %                          35.00
         Warp Execution Efficiency                                                           %                          96.00
         Stall Long Scoreboard                                                                %                          31.00
+        Eligible Warps Per Scheduler                                                      warp                           0.07
+        WRN   On average each warp of this kernel spends 101.6 cycles being stalled waiting on
+              a L1TEX operation. This represents about 91.2% of the total average.
         """,
         encoding="utf-8",
     )
@@ -40,7 +46,11 @@ def test_parse_ncu_text_report(tmp_path: Path) -> None:
     assert row["ncu_l1_hit_rate_pct"] == 22.50
     assert row["ncu_l2_hit_rate_pct"] == 35.00
     assert row["ncu_warp_execution_efficiency_pct"] == 96.00
-    assert row["ncu_long_scoreboard_stall_pct"] == 31.00
+    assert row["ncu_memory_throughput_gbps"] == 554.92
+    assert row["ncu_mem_busy_pct"] == 31.08
+    assert row["ncu_max_bandwidth_pct"] == 85.41
+    assert row["ncu_eligible_warps_per_scheduler"] == 0.07
+    assert row["ncu_long_scoreboard_stall_pct"] == 91.2
 
 
 def test_attach_ncu_metrics_matches_kernel_name() -> None:

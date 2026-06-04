@@ -305,6 +305,11 @@ def _build_ncu_section(profile: pd.DataFrame) -> list[str]:
         "ncu_l2_hit_rate_pct",
         "ncu_warp_execution_efficiency_pct",
         "ncu_memory_stall_pct",
+        "ncu_long_scoreboard_stall_pct",
+        "ncu_memory_throughput_gbps",
+        "ncu_mem_busy_pct",
+        "ncu_max_bandwidth_pct",
+        "ncu_eligible_warps_per_scheduler",
     ]
     if not any(column in profile.columns for column in ncu_columns):
         return []
@@ -334,6 +339,16 @@ def _build_ncu_section(profile: pd.DataFrame) -> list[str]:
         table["warp_eff"] = profile["ncu_warp_execution_efficiency_pct"].map(_format_optional_pct)
     if _has_values(profile, "ncu_memory_stall_pct"):
         table["memory_stall"] = profile["ncu_memory_stall_pct"].map(_format_optional_pct)
+    if _has_values(profile, "ncu_long_scoreboard_stall_pct"):
+        table["long_scoreboard"] = profile["ncu_long_scoreboard_stall_pct"].map(_format_optional_pct)
+    if _has_values(profile, "ncu_memory_throughput_gbps"):
+        table["mem_GBps"] = profile["ncu_memory_throughput_gbps"].map(_format_optional_float)
+    if _has_values(profile, "ncu_mem_busy_pct"):
+        table["mem_busy"] = profile["ncu_mem_busy_pct"].map(_format_optional_pct)
+    if _has_values(profile, "ncu_max_bandwidth_pct"):
+        table["max_bw"] = profile["ncu_max_bandwidth_pct"].map(_format_optional_pct)
+    if _has_values(profile, "ncu_eligible_warps_per_scheduler"):
+        table["eligible_warps"] = profile["ncu_eligible_warps_per_scheduler"].map(_format_optional_float)
 
     return [
         "## Nsight Compute Metrics",

@@ -10,6 +10,10 @@ import pandas as pd
 NCU_METRIC_COLUMNS = [
     "ncu_duration_us",
     "ncu_memory_util_pct",
+    "ncu_memory_throughput_gbps",
+    "ncu_mem_busy_pct",
+    "ncu_max_bandwidth_pct",
+    "ncu_mem_pipes_busy_pct",
     "ncu_sol_dram_pct",
     "ncu_sol_l1_tex_pct",
     "ncu_sol_l2_pct",
@@ -24,7 +28,15 @@ NCU_METRIC_COLUMNS = [
     "ncu_warp_execution_efficiency_pct",
     "ncu_branch_efficiency_pct",
     "ncu_issue_slot_util_pct",
+    "ncu_one_or_more_eligible_pct",
+    "ncu_no_eligible_pct",
+    "ncu_issued_warp_per_scheduler",
+    "ncu_active_warps_per_scheduler",
     "ncu_eligible_warps_per_scheduler",
+    "ncu_warp_cycles_per_issued_instruction",
+    "ncu_warp_cycles_per_executed_instruction",
+    "ncu_avg_active_threads_per_warp",
+    "ncu_avg_not_predicated_threads_per_warp",
     "ncu_memory_stall_pct",
     "ncu_barrier_stall_pct",
     "ncu_long_scoreboard_stall_pct",
@@ -37,8 +49,12 @@ NCU_METRIC_COLUMNS = [
 
 _TEXT_METRICS = {
     "ncu_duration_us": ["Duration"],
-    "ncu_memory_util_pct": ["Memory [%]"],
-    "ncu_sol_dram_pct": ["SOL DRAM"],
+    "ncu_memory_util_pct": ["Memory [%]", "Mem Busy"],
+    "ncu_memory_throughput_gbps": ["Memory Throughput"],
+    "ncu_mem_busy_pct": ["Mem Busy"],
+    "ncu_max_bandwidth_pct": ["Max Bandwidth"],
+    "ncu_mem_pipes_busy_pct": ["Mem Pipes Busy"],
+    "ncu_sol_dram_pct": ["SOL DRAM", "Max Bandwidth"],
     "ncu_sol_l1_tex_pct": ["SOL L1/TEX Cache"],
     "ncu_sol_l2_pct": ["SOL L2 Cache"],
     "ncu_sm_util_pct": ["SM [%]"],
@@ -52,7 +68,15 @@ _TEXT_METRICS = {
     "ncu_warp_execution_efficiency_pct": ["Warp Execution Efficiency"],
     "ncu_branch_efficiency_pct": ["Branch Efficiency"],
     "ncu_issue_slot_util_pct": ["Issue Slots Busy", "Issue Slot Utilization"],
+    "ncu_one_or_more_eligible_pct": ["One or More Eligible"],
+    "ncu_no_eligible_pct": ["No Eligible"],
+    "ncu_issued_warp_per_scheduler": ["Issued Warp Per Scheduler"],
+    "ncu_active_warps_per_scheduler": ["Active Warps Per Scheduler"],
     "ncu_eligible_warps_per_scheduler": ["Eligible Warps Per Scheduler"],
+    "ncu_warp_cycles_per_issued_instruction": ["Warp Cycles Per Issued Instruction"],
+    "ncu_warp_cycles_per_executed_instruction": ["Warp Cycles Per Executed Instruction"],
+    "ncu_avg_active_threads_per_warp": ["Avg. Active Threads Per Warp"],
+    "ncu_avg_not_predicated_threads_per_warp": ["Avg. Not Predicated Off Threads Per Warp"],
     "ncu_memory_stall_pct": ["Stall Memory Dependency", "Stall Memory Throttle", "Memory Stall"],
     "ncu_barrier_stall_pct": ["Stall Barrier", "Barrier Stall"],
     "ncu_long_scoreboard_stall_pct": ["Stall Long Scoreboard", "Long Scoreboard"],
@@ -116,22 +140,25 @@ def parse_ncu_report_file(path: str | Path, kernel_name: str | None = None) -> d
     row.update({column: pd.NA for column in NCU_METRIC_COLUMNS})
 
     _parse_text_metrics(text, row)
+    _parse_warning_metrics(text, row)
     _parse_csv_like_metrics(text, row)
     return row
 
 
 def _parse_text_metrics(text: str, row: dict[str, object]) -> None:
     for column, labels in _TEXT_METRICS.items():
-        values = []
-        for line in text.splitlines():
-            stripped = line.strip()
-            if not _starts_with_any_label(stripped, labels):
-                continue
-            numeric_values = _numeric_values(stripped)
-            if numeric_values:
-                values.append(numeric_values[-1])
-        if values:
-            row[column] = sum(values) / len(values)
+        for label in labels:
+            values = []
+            for line in text.splitlines():
+                stripped = line.strip()
+                if not _starts_with_any_label(stripped, [label]):
+                    continue
+                numeric_values = _numeric_values(stripped)
+                if numeric_values:
+                    values.append(numeric_values[-1])
+            if values:
+                row[column] = sum(values) / len(values)
+                break
 
 
 def _parse_csv_like_metrics(text: str, row: dict[str, object]) -> None:
@@ -148,6 +175,12 @@ def _parse_csv_like_metrics(text: str, row: dict[str, object]) -> None:
                 row[column] = numeric_values[-1]
 
 
+def _parse_warning_metrics(text: str, row: dict[str, object]) -> None:
+    scoreboard_match = re.search(r"represents about\s+(\d+(?:\.\d+)?)%\s+of the total", text)
+    if scoreboard_match:
+        row["ncu_long_scoreboard_stall_pct"] = float(scoreboard_match.group(1))
+
+
 def _numeric_values(text: str) -> list[float]:
     return [float(value) for value in re.findall(r"(?<![A-Za-z])-?\d+(?:\.\d+)?", text)]
 
@@ -158,8 +191,8 @@ def _matches_any_label(text: str, labels: list[str]) -> bool:
 
 
 def _starts_with_any_label(text: str, labels: list[str]) -> bool:
-    normalized = _normalize_metric_text(text)
-    return any(normalized.startswith(_normalize_metric_text(label)) for label in labels)
+    lowered = text.lower()
+    return any(lowered.startswith(label.lower()) for label in labels)
 
 
 def _matches_csv_alias(text: str, column: str) -> bool:
