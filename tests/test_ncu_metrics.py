@@ -121,3 +121,35 @@ def test_feature_cost_v6_uses_cache_and_stall_signals() -> None:
     assert "cache_hit=0.18" in str(estimate["feature_summary"])
     assert "latency_stall=0.36" in str(estimate["feature_summary"])
     assert float(estimate["estimated_speedup"]) > 0.0
+
+
+def test_feature_cost_v6_allows_collective_memory_primitive_override() -> None:
+    hardware = HardwareConfig("test", peak_flops=10e12, peak_memory_bandwidth=1e12)
+    profile = pd.DataFrame(
+        {
+            "kernel_name": ["reduction"],
+            "runtime_ms": [1.0],
+            "flops": [1e6],
+            "dram_read_bytes": [512e6],
+            "dram_write_bytes": [4e6],
+            "memory_access_pattern": ["regular"],
+            "notes": [""],
+        }
+    )
+    profile = add_roofline_metrics(profile, hardware)
+    row = profile.iloc[0].copy()
+    row["ncu_sol_dram_pct"] = 0.5
+    row["ncu_l1_hit_rate_pct"] = 0.0
+    row["ncu_l2_hit_rate_pct"] = 16.0
+    row["ncu_long_scoreboard_stall_pct"] = 88.0
+    row["ncu_eligible_warps_per_scheduler"] = 0.04
+    metadata = pd.Series(
+        {
+            "paper_notes": "Reduction is a bandwidth-sensitive parallel primitive with synchronization phases.",
+        }
+    )
+
+    estimate = estimate_feature_cost_v6(row, hardware, metadata)
+
+    assert estimate["predicted_candidate"] is True
+    assert "collective memory primitive" in str(estimate["risk"])

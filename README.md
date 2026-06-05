@@ -125,6 +125,7 @@ ncu_long_scoreboard_stall_pct
 `feature_cost_v4`는 `matrix_mul_tiled`처럼 bandwidth를 많이 쓰더라도 data reuse가 큰 GEMM 계열 workload를 naive PIM candidate로 보지 않도록 설계되었습니다.
 `feature_cost_v5`는 `vector_add`처럼 NCU에서 `SOL DRAM`이 높고 `SM [%]`가 낮게 나온 kernel을 실제 DRAM-bound로 더 강하게 확인하고, 반대로 SM/cache/reuse signal이 강한 kernel은 PIM 후보에서 더 보수적으로 처리합니다.
 `feature_cost_v6`는 cache hit가 높고 warp/control-flow risk가 큰 workload를 GPU-friendly로 더 보수적으로 보고, cache hit가 낮고 long scoreboard/memory stall이 높은 workload를 PIM/NMP opportunity로 더 강하게 봅니다.
+또한 상세 NCU run에서 `SM [%]`나 occupancy가 수집되지 않은 경우 실제 0으로 취급하지 않고 `NA`로 유지합니다. `reduction`, `scan`처럼 synchronization phase가 있지만 memory primitive 성격이 강한 workload는 `collective memory primitive` 신호를 별도로 반영합니다.
 
 The report also includes an end-to-end policy estimate:
 
