@@ -17,11 +17,15 @@ scp "$SERVER:$REMOTE_REPO/profiles/gpu_profile.csv" ./profiles/
 echo "Fetching Nsight Compute metrics if present"
 scp "$SERVER:$REMOTE_REPO/profiles/ncu_metrics.csv" ./profiles/ || true
 scp -r "$SERVER:$REMOTE_REPO/profiles/ncu" ./profiles/ || true
+scp -r "$SERVER:$REMOTE_REPO/profiles/size_sweep" ./profiles/ || true
 
 echo "Fetching SAIT PIM simulation CSV if present"
 scp "$SERVER:$REMOTE_REPO/simulators/sait_pim_simulation.csv" ./simulators/ || true
 
 echo "Fetching raw SAIT PIMSimulator logs if present"
 scp -r "$SERVER:$REMOTE_PIM_RESULTS" ./simulators/ || true
+
+echo "Fetching size sweep outputs if present"
+scp -r "$SERVER:$REMOTE_REPO/outputs/size_sweep" ./outputs/ || true
 
 echo "Fetched results into local outputs/, profiles/, and simulators/."

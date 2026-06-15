@@ -350,6 +350,37 @@ python3 main.py \
 
 `--ncu-metrics`가 들어오면 report에 `Nsight Compute Metrics` 섹션이 추가됩니다. 기본 NCU counter만 있으면 model comparison에 `feature_cost_v5`가 포함되고, cache/stall/warp counter까지 있으면 `feature_cost_v6`가 포함됩니다. End-to-end estimate도 가장 최신 feature-cost model을 공통 cost model로 사용합니다.
 
+## Problem Size Sweep
+
+단일 problem size만 보면 모델이 특정 크기에 과적합됐는지 알기 어렵습니다. Size sweep은 같은 benchmark suite를 small/medium/large 입력 크기에서 반복 실행하고, 각 크기별 report와 전체 summary를 생성합니다.
+
+```bash
+bash scripts/profile_size_sweep.sh
+```
+
+기본 scale은 다음과 같습니다.
+
+```text
+small  : vector_n=1,048,576   matrix_n=512
+medium : vector_n=4,194,304   matrix_n=1024
+large  : vector_n=16,777,216  matrix_n=1536
+```
+
+생성물:
+
+```text
+profiles/size_sweep/gpu_profile_small.csv
+profiles/size_sweep/gpu_profile_medium.csv
+profiles/size_sweep/gpu_profile_large.csv
+outputs/size_sweep/small/reports/analysis_report.md
+outputs/size_sweep/medium/reports/analysis_report.md
+outputs/size_sweep/large/reports/analysis_report.md
+outputs/size_sweep/size_sweep_summary.csv
+outputs/size_sweep/size_sweep_summary.md
+```
+
+이 단계는 NCU를 다시 돌리지 않고 CUDA event profile과 analytical/model comparison을 크기별로 비교합니다. NCU까지 size별로 수집하면 시간이 크게 늘어나므로, 먼저 GPU runtime/roofline/model trend를 확인한 뒤 필요한 scale만 골라 NCU를 추가로 돌리는 방식이 좋습니다.
+
 ## PIM Simulator Integration
 
 실제 PIM hardware가 없어도, 오픈소스 PIM simulator 결과를 analyzer에 연결할 수 있습니다. 외부 simulator를 이 repository 안에 직접 vendoring하지 않고, simulator output을 공통 CSV schema로 변환해서 입력합니다.

@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "benchmark_args.h"
+
 #define CHECK_CUDA(call)                                                        \
     do {                                                                        \
         cudaError_t status = (call);                                            \
@@ -26,9 +28,9 @@
     } while (0)
 
 int main(int argc, char** argv) {
-    bool csv = argc > 1 && std::strcmp(argv[1], "--csv") == 0;
-    const int n = 2048;
-    const int iterations = 10;
+    BenchmarkArgs args = parse_benchmark_args(argc, argv);
+    const int n = choose_arg(args.n, 2048);
+    const int iterations = choose_arg(args.iterations, 10);
     const size_t matrix_bytes = static_cast<size_t>(n) * n * sizeof(float);
 
     float* a = nullptr;
@@ -96,9 +98,9 @@ int main(int argc, char** argv) {
     const double dram_read_bytes = 2.0 * static_cast<double>(matrix_bytes);
     const double dram_write_bytes = static_cast<double>(matrix_bytes);
 
-    if (csv) {
-        std::printf("cublas_sgemm,%.6f,%.0f,%.0f,%.0f,regular,Measured cuBLAS SGEMM on GPU\n",
-                    runtime_ms, flops, dram_read_bytes, dram_write_bytes);
+    if (args.csv) {
+        std::printf("cublas_sgemm,%.6f,%.0f,%.0f,%.0f,regular,Measured cuBLAS SGEMM on GPU n=%d\n",
+                    runtime_ms, flops, dram_read_bytes, dram_write_bytes, n);
     } else {
         std::printf("cublas_sgemm runtime_ms=%.6f n=%d\n", runtime_ms, n);
     }

@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "benchmark_args.h"
+
 #define CHECK_CUDA(call)                                                        \
     do {                                                                        \
         cudaError_t status = (call);                                            \
@@ -37,10 +39,10 @@ __global__ void transpose_kernel(const float* input, float* output, int width) {
 }
 
 int main(int argc, char** argv) {
-    bool csv = argc > 1 && std::strcmp(argv[1], "--csv") == 0;
-    const int width = 4096;
+    BenchmarkArgs args = parse_benchmark_args(argc, argv);
+    const int width = choose_arg(args.n, 4096);
     const int n = width * width;
-    const int iterations = 40;
+    const int iterations = choose_arg(args.iterations, 40);
     const size_t bytes = static_cast<size_t>(n) * sizeof(float);
 
     float* input = nullptr;
@@ -73,9 +75,9 @@ int main(int argc, char** argv) {
     const double dram_read_bytes = static_cast<double>(bytes);
     const double dram_write_bytes = static_cast<double>(bytes);
 
-    if (csv) {
-        std::printf("matrix_transpose,%.6f,%.0f,%.0f,%.0f,regular,Measured CUDA tiled matrix transpose on GPU\n",
-                    runtime_ms, flops, dram_read_bytes, dram_write_bytes);
+    if (args.csv) {
+        std::printf("matrix_transpose,%.6f,%.0f,%.0f,%.0f,regular,Measured CUDA tiled matrix transpose on GPU width=%d\n",
+                    runtime_ms, flops, dram_read_bytes, dram_write_bytes, width);
     } else {
         std::printf("matrix_transpose runtime_ms=%.6f width=%d\n", runtime_ms, width);
     }

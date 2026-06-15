@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "benchmark_args.h"
+
 #define CHECK_CUDA(call)                                                        \
     do {                                                                        \
         cudaError_t status = (call);                                            \
@@ -29,9 +31,9 @@ __global__ void random_gather_kernel(const float* table, const int* indices, flo
 }
 
 int main(int argc, char** argv) {
-    bool csv = argc > 1 && std::strcmp(argv[1], "--csv") == 0;
-    const int n = 1 << 24;
-    const int iterations = 30;
+    BenchmarkArgs args = parse_benchmark_args(argc, argv);
+    const int n = choose_arg(args.n, 1 << 24);
+    const int iterations = choose_arg(args.iterations, 30);
     const size_t float_bytes = static_cast<size_t>(n) * sizeof(float);
     const size_t index_bytes = static_cast<size_t>(n) * sizeof(int);
 
@@ -68,9 +70,9 @@ int main(int argc, char** argv) {
     const double dram_read_bytes = static_cast<double>(float_bytes + index_bytes);
     const double dram_write_bytes = static_cast<double>(float_bytes);
 
-    if (csv) {
-        std::printf("random_gather,%.6f,%.0f,%.0f,%.0f,irregular,Measured CUDA random gather on GPU\n",
-                    runtime_ms, flops, dram_read_bytes, dram_write_bytes);
+    if (args.csv) {
+        std::printf("random_gather,%.6f,%.0f,%.0f,%.0f,irregular,Measured CUDA random gather on GPU n=%d\n",
+                    runtime_ms, flops, dram_read_bytes, dram_write_bytes, n);
     } else {
         std::printf("random_gather runtime_ms=%.6f n=%d\n", runtime_ms, n);
     }

@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "benchmark_args.h"
+
 #define CHECK_CUDA(call)                                                        \
     do {                                                                        \
         cudaError_t status = (call);                                            \
@@ -29,10 +31,10 @@ __global__ void gemv_kernel(const float* matrix, const float* vector, float* out
 }
 
 int main(int argc, char** argv) {
-    bool csv = argc > 1 && std::strcmp(argv[1], "--csv") == 0;
-    const int rows = 4096;
-    const int cols = 4096;
-    const int iterations = 20;
+    BenchmarkArgs args = parse_benchmark_args(argc, argv);
+    const int rows = choose_arg(args.rows, choose_arg(args.n, 4096));
+    const int cols = choose_arg(args.cols, choose_arg(args.n, 4096));
+    const int iterations = choose_arg(args.iterations, 20);
     const size_t matrix_elems = static_cast<size_t>(rows) * cols;
     const size_t matrix_bytes = matrix_elems * sizeof(float);
     const size_t vector_bytes = static_cast<size_t>(cols) * sizeof(float);
@@ -71,9 +73,9 @@ int main(int argc, char** argv) {
     const double dram_read_bytes = static_cast<double>(matrix_bytes + vector_bytes);
     const double dram_write_bytes = static_cast<double>(output_bytes);
 
-    if (csv) {
-        std::printf("gemv,%.6f,%.0f,%.0f,%.0f,regular,Measured CUDA matrix-vector multiplication on GPU\n",
-                    runtime_ms, flops, dram_read_bytes, dram_write_bytes);
+    if (args.csv) {
+        std::printf("gemv,%.6f,%.0f,%.0f,%.0f,regular,Measured CUDA matrix-vector multiplication on GPU rows=%d cols=%d\n",
+                    runtime_ms, flops, dram_read_bytes, dram_write_bytes, rows, cols);
     } else {
         std::printf("gemv runtime_ms=%.6f rows=%d cols=%d\n", runtime_ms, rows, cols);
     }

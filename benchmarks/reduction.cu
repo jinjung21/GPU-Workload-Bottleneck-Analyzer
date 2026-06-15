@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "benchmark_args.h"
+
 #define CHECK_CUDA(call)                                                        \
     do {                                                                        \
         cudaError_t status = (call);                                            \
@@ -64,11 +66,11 @@ __global__ void reduce_final_kernel(const float* partial, float* output, int n) 
 }
 
 int main(int argc, char** argv) {
-    bool csv = argc > 1 && std::strcmp(argv[1], "--csv") == 0;
-    const int n = 1 << 24;
+    BenchmarkArgs args = parse_benchmark_args(argc, argv);
+    const int n = choose_arg(args.n, 1 << 24);
     const int block_size = 256;
     const int grid_size = (n + block_size * 2 - 1) / (block_size * 2);
-    const int iterations = 80;
+    const int iterations = choose_arg(args.iterations, 80);
     const size_t input_bytes = static_cast<size_t>(n) * sizeof(float);
     const size_t partial_bytes = static_cast<size_t>(grid_size) * sizeof(float);
 
@@ -104,9 +106,9 @@ int main(int argc, char** argv) {
     const double dram_read_bytes = static_cast<double>(input_bytes + partial_bytes);
     const double dram_write_bytes = static_cast<double>(partial_bytes + sizeof(float));
 
-    if (csv) {
-        std::printf("reduction,%.6f,%.0f,%.0f,%.0f,regular,Measured CUDA parallel reduction on GPU\n",
-                    runtime_ms, flops, dram_read_bytes, dram_write_bytes);
+    if (args.csv) {
+        std::printf("reduction,%.6f,%.0f,%.0f,%.0f,regular,Measured CUDA parallel reduction on GPU n=%d\n",
+                    runtime_ms, flops, dram_read_bytes, dram_write_bytes, n);
     } else {
         std::printf("reduction runtime_ms=%.6f n=%d\n", runtime_ms, n);
     }
