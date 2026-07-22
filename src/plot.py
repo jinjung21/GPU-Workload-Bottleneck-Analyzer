@@ -77,7 +77,7 @@ def save_model_comparison_plot(
 
     metrics = model_metrics.copy().sort_values("f1", ascending=False)
     models = set(model_comparison["model"])
-    speedup_model = "feature_cost_v4" if "feature_cost_v4" in models else "feature_cost_v3"
+    speedup_model = _latest_feature_model(models)
     if speedup_model not in models:
         speedup_model = "analytical_v2"
     speedups = model_comparison[model_comparison["model"] == speedup_model].copy()
@@ -94,7 +94,7 @@ def save_model_comparison_plot(
     axes[0].set_xticks(list(x))
     axes[0].set_xticklabels(metrics["model"], rotation=20, ha="right")
     axes[0].set_ylim(0, 1.08)
-    axes[0].set_title("Candidate Selection Quality")
+    axes[0].set_title("Calibration-Set Label Alignment")
     axes[0].set_ylabel("Score")
     axes[0].grid(axis="y", linestyle=":", linewidth=0.6)
     axes[0].legend()
@@ -118,7 +118,8 @@ def save_end_to_end_plot(end_to_end: pd.DataFrame, output_path: str | Path) -> N
     output.parent.mkdir(parents=True, exist_ok=True)
 
     data = end_to_end.copy().sort_values("total_runtime_ms", ascending=True)
-    colors = ["#2ca02c" if model == "feature_cost_v4" else "#1f77b4" for model in data["model"]]
+    latest_model = _latest_feature_model(set(data["model"]))
+    colors = ["#2ca02c" if model == latest_model else "#1f77b4" for model in data["model"]]
     colors = ["#7f7f7f" if model == "gpu_only" else color for model, color in zip(data["model"], colors)]
     colors = ["#9467bd" if model == "oracle_labels" else color for model, color in zip(data["model"], colors)]
 
@@ -139,6 +140,45 @@ def save_end_to_end_plot(end_to_end: pd.DataFrame, output_path: str | Path) -> N
     plt.close(fig)
 
 
+def save_size_sweep_plot(summary: pd.DataFrame, output_path: str | Path) -> None:
+    """Plot runtime scaling and analytical PIM opportunity across input sizes."""
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    data = summary.copy()
+    scale_order = ["small", "medium", "large"]
+    data["scale"] = pd.Categorical(data["scale"], categories=scale_order, ordered=True)
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6.5))
+    for benchmark, group in data.groupby("benchmark", sort=False, observed=True):
+        group = group.sort_values("scale")
+        axes[0].plot(group["scale"].astype(str), group["runtime_ms"], marker="o", linewidth=1.8, label=benchmark)
+        axes[1].plot(
+            group["scale"].astype(str),
+            group["estimated_speedup"],
+            marker="o",
+            linewidth=1.8,
+            label=benchmark,
+        )
+
+    axes[0].set_yscale("log")
+    axes[0].set_title("Measured GPU Runtime Scaling")
+    axes[0].set_xlabel("Problem size")
+    axes[0].set_ylabel("Runtime (ms, log scale)")
+    axes[0].grid(True, which="both", linestyle=":", linewidth=0.6)
+
+    axes[1].axhline(1.0, color="#444444", linestyle="--", linewidth=1.0)
+    axes[1].set_title("Analytical PIM/NMP Opportunity by Size")
+    axes[1].set_xlabel("Problem size")
+    axes[1].set_ylabel("Estimated speedup")
+    axes[1].grid(True, linestyle=":", linewidth=0.6)
+    axes[1].legend(loc="upper center", bbox_to_anchor=(-0.12, -0.16), ncol=3, frameon=False)
+
+    fig.subplots_adjust(bottom=0.28, wspace=0.28)
+    fig.savefig(output, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _logspace(start: float, stop: float, points: int) -> list[float]:
     """Small helper to avoid adding NumPy as a direct dependency."""
 
@@ -148,3 +188,10 @@ def _logspace(start: float, stop: float, points: int) -> list[float]:
     log_stop = math.log10(stop)
     step = (log_stop - log_start) / (points - 1)
     return [10 ** (log_start + step * i) for i in range(points)]
+
+
+def _latest_feature_model(models: set[str]) -> str:
+    for model in ["feature_cost_v6", "feature_cost_v5", "feature_cost_v4", "feature_cost_v3"]:
+        if model in models:
+            return model
+    return "analytical_v2"

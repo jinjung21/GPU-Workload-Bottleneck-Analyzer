@@ -110,6 +110,7 @@ def save_markdown_report(
         "- PIM/NMP suitability still includes heuristic components that require calibration.",
         "- Nsight Compute metrics are included when `--ncu-metrics` is provided.",
         "- Paper baseline comparison checks workload-category alignment, not measured PIM speedup.",
+        "- Precision/recall/F1 are calibration-set alignment metrics, not held-out test accuracy.",
         "- Analytical PIM and end-to-end speedup estimates are model outputs, not hardware measurements.",
         "",
     ]
@@ -193,7 +194,7 @@ def _build_model_comparison_section(
     return [
         "## Model Comparison",
         "",
-        "The table compares simple baselines against analytical and feature-cost PIM/NMP candidate models.",
+        "The table compares simple baselines against analytical and feature-cost PIM/NMP candidate models. Scores measure alignment on this labeled calibration set; they are not held-out generalization accuracy.",
         *figure_lines,
         "",
         metric_table.to_markdown(index=False),
@@ -218,28 +219,35 @@ def _build_final_decision_section(model_comparison: pd.DataFrame | None) -> list
         lambda value: "PIM/NMP" if bool(value) else "GPU"
     )
     decision["simulated_pim_time_ms"] = decision.get("simulated_pim_time_ms", pd.NA)
+    decision["simulated_scaled_pim_time_ms"] = decision.get("simulated_scaled_pim_time_ms", pd.NA)
     decision["simulated_speedup"] = decision.get("simulated_speedup", pd.NA)
     decision["simulated_pim_cycles"] = decision.get("simulated_pim_cycles", pd.NA)
     decision["estimated_speedup"] = decision["estimated_speedup"].map(lambda value: f"{float(value):.2f}x")
     decision["estimated_pim_time_ms"] = decision["estimated_pim_time_ms"].map(lambda value: f"{float(value):.3f}")
     decision["simulated_pim_time_ms"] = decision["simulated_pim_time_ms"].map(_format_optional_ms)
+    decision["simulated_scaled_pim_time_ms"] = decision["simulated_scaled_pim_time_ms"].map(_format_optional_ms)
     decision["simulated_speedup"] = decision["simulated_speedup"].map(_format_optional_speedup)
     decision["simulated_pim_cycles"] = decision["simulated_pim_cycles"].map(_format_optional_int)
+    decision["ncu_feature_coverage"] = decision.get("ncu_feature_coverage", pd.NA).map(_format_optional_pct_fraction)
+    decision["evidence_tier"] = decision.apply(_evidence_tier, axis=1)
     columns = [
         "benchmark",
         "final_decision",
         "estimated_speedup",
         "estimated_pim_time_ms",
         "simulated_pim_time_ms",
+        "simulated_scaled_pim_time_ms",
         "simulated_pim_cycles",
         "simulated_speedup",
+        "ncu_feature_coverage",
+        "evidence_tier",
         "risk",
     ]
 
     return [
         "## Final Offload Decision",
         "",
-        f"The final decision uses `{decision_model}`, which is the current policy model.",
+        f"The final decision uses `{decision_model}`, which is the current policy model. `simulated_pim_time_ms` is raw simulator-clock time; `simulated_scaled_pim_time_ms` applies simulator speedup to measured GPU runtime for cross-domain comparison.",
         "",
         decision[columns].to_markdown(index=False),
         "",
@@ -380,6 +388,8 @@ def _build_end_to_end_section(
         "offloaded_kernels",
         "false_offloads",
         "missed_candidates",
+        "simulator_backed_offloads",
+        "analytical_fallback_offloads",
         "runtime_source",
     ]
 
@@ -391,7 +401,7 @@ def _build_end_to_end_section(
     return [
         "## End-to-End Policy Estimate",
         "",
-        "This section estimates total workload runtime by applying each offload policy to the same kernels. Candidate kernels use a common PIM/NMP runtime source; non-candidates keep measured GPU runtime.",
+        "This section estimates total workload runtime by applying each offload policy to the same kernels. Simulator speedup is normalized to measured GPU runtime where available; uncovered candidates fall back to the analytical model.",
         *figure_lines,
         "",
         table[columns].to_markdown(index=False),
@@ -407,7 +417,8 @@ def _build_simulation_section(summary: dict[str, int | float | str] | None) -> l
         "",
         f"- Simulator source: {summary.get('simulators', '')}.",
         f"- Coverage: {summary.get('simulated', 0)}/{summary.get('benchmarks', 0)} profiled benchmarks have simulated PIM runtime ({summary.get('coverage', 0.0):.1%}).",
-        "- End-to-end policy estimates use simulated PIM runtime where available and fall back to analytical estimates for uncovered kernels.",
+        "- Raw simulator cycles remain in the report for traceability, but cross-platform end-to-end totals use simulator-reported speedup scaled to measured GPU runtime.",
+        "- Kernels without a mapped simulator result fall back to the analytical feature-cost estimate and are counted separately.",
         "",
     ]
 
@@ -453,6 +464,20 @@ def _format_optional_pct(value: object) -> str:
 
 def _format_optional_float(value: object) -> str:
     return "" if pd.isna(value) else f"{float(value):.3f}"
+
+
+def _format_optional_pct_fraction(value: object) -> str:
+    return "" if pd.isna(value) else f"{float(value):.0%}"
+
+
+def _evidence_tier(row: pd.Series) -> str:
+    has_simulator = pd.notna(row.get("simulated_speedup"))
+    has_ncu = pd.notna(row.get("ncu_feature_coverage"))
+    if has_simulator and has_ncu:
+        return "A: GPU + NCU + PIM simulator"
+    if has_ncu:
+        return "B: GPU + NCU + analytical PIM"
+    return "C: GPU + analytical PIM"
 
 
 def _calibration_result(row: pd.Series) -> str:

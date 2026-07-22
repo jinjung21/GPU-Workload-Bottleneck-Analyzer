@@ -65,6 +65,7 @@ def test_attach_simulation_results_and_summary() -> None:
             "model": ["feature_cost_v4", "feature_cost_v4"],
             "benchmark": ["vector_add", "cublas_sgemm"],
             "predicted_candidate": [True, False],
+            "gpu_runtime_ms": [1.0, 4.0],
         }
     )
     simulation = pd.DataFrame(
@@ -85,8 +86,10 @@ def test_attach_simulation_results_and_summary() -> None:
     summary = summarize_simulation_coverage(attached)
 
     assert attached.loc[0, "simulated_pim_time_ms"] == 0.05
+    assert round(attached.loc[0, "simulated_scaled_pim_time_ms"], 6) == round(1.0 / 1.98597, 6)
     assert attached.loc[0, "simulated_pim_cycles"] == 3349
     assert attached.loc[0, "simulated_speedup"] == 1.98597
+    assert attached.loc[0, "simulation_time_basis"] == "simulator speedup scaled to measured GPU runtime"
     assert pd.isna(attached.loc[1, "simulated_pim_time_ms"])
     assert summary["simulated"] == 1
     assert summary["benchmarks"] == 2

@@ -6,6 +6,22 @@ from .config import HardwareConfig
 from .cost_model_v5 import estimate_feature_cost_v5
 
 
+V6_OPTIONAL_COUNTERS = (
+    "ncu_l1_hit_rate_pct",
+    "ncu_l2_hit_rate_pct",
+    "ncu_global_load_efficiency_pct",
+    "ncu_global_store_efficiency_pct",
+    "ncu_warp_execution_efficiency_pct",
+    "ncu_branch_efficiency_pct",
+    "ncu_memory_stall_pct",
+    "ncu_long_scoreboard_stall_pct",
+    "ncu_short_scoreboard_stall_pct",
+    "ncu_barrier_stall_pct",
+    "ncu_eligible_warps_per_scheduler",
+    "ncu_registers_per_thread",
+)
+
+
 def estimate_feature_cost_v6(
     profile_row: pd.Series,
     hardware: HardwareConfig,
@@ -38,6 +54,9 @@ def estimate_feature_cost_v6(
     eligible_warps = _number(profile_row, "ncu_eligible_warps_per_scheduler", default=4.0)
     registers = _number(profile_row, "ncu_registers_per_thread", default=0.0)
     collective_bonus = _collective_memory_bonus(profile_row, metadata_row)
+    counter_coverage = sum(pd.notna(profile_row.get(column)) for column in V6_OPTIONAL_COUNTERS) / len(
+        V6_OPTIONAL_COUNTERS
+    )
 
     cache_hit_score = max(l1_hit, l2_hit)
     low_cache_reuse = 1.0 - cache_hit_score
@@ -65,7 +84,8 @@ def estimate_feature_cost_v6(
     )
     control_flow_risk = min(1.0, 0.65 * divergence_risk + 0.35 * barrier_stall)
 
-    calibration = 1.0 - 0.26 * pim_opportunity + 0.34 * gpu_locality_advantage + 0.22 * control_flow_risk
+    raw_calibration = 1.0 - 0.26 * pim_opportunity + 0.34 * gpu_locality_advantage + 0.22 * control_flow_risk
+    calibration = 1.0 + counter_coverage * (raw_calibration - 1.0)
     calibrated_pim_time_ms = max(0.0, float(base["estimated_pim_time_ms"]) * calibration)
     gpu_time_ms = float(base["predicted_gpu_time_ms"])
     speedup = gpu_time_ms / calibrated_pim_time_ms if calibrated_pim_time_ms > 0 else 0.0
@@ -94,13 +114,21 @@ def estimate_feature_cost_v6(
         "estimated_speedup": speedup,
         "predicted_candidate": predicted_candidate,
         "risk_score": risk_score,
-        "risk": _risk_summary(base["risk"], pim_opportunity, gpu_locality_advantage, control_flow_risk, collective_bonus),
+        "ncu_feature_coverage": counter_coverage,
+        "risk": _risk_summary(
+            base["risk"],
+            pim_opportunity,
+            gpu_locality_advantage,
+            control_flow_risk,
+            collective_bonus,
+            counter_coverage,
+        ),
         "feature_summary": (
             f"{base['feature_summary']}, "
             f"cache_hit={cache_hit_score:.2f}, mem_eff_gap={memory_efficiency_gap:.2f}, "
             f"latency_stall={latency_stall:.2f}, divergence={divergence_risk:.2f}, "
             f"collective_bonus={collective_bonus:.2f}, v6_opportunity={pim_opportunity:.2f}, "
-            f"v6_risk={risk_score:.2f}"
+            f"v6_risk={risk_score:.2f}, ncu_coverage={counter_coverage:.0%}"
         ),
     }
 
@@ -160,6 +188,7 @@ def _risk_summary(
     gpu_locality_advantage: float,
     control_flow_risk: float,
     collective_bonus: float,
+    counter_coverage: float,
 ) -> str:
     risks = [str(base_risk)] if str(base_risk) else []
     if pim_opportunity >= 0.55:
@@ -170,4 +199,6 @@ def _risk_summary(
         risks.append("GPU locality advantage")
     if control_flow_risk >= 0.35:
         risks.append("control-flow or barrier risk")
+    if counter_coverage < 0.75:
+        risks.append(f"partial NCU coverage ({counter_coverage:.0%})")
     return ", ".join(risks)

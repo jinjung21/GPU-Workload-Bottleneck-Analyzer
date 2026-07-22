@@ -56,7 +56,7 @@ def main() -> None:
         simulation = load_pim_simulation_csv(args.pim_simulation) if args.pim_simulation else None
         model_comparison = attach_simulation_results(model_comparison, simulation)
         simulation_summary = summarize_simulation_coverage(model_comparison)
-        runtime_source = "simulated" if simulation is not None else "estimated"
+        runtime_source = "simulator_scaled" if simulation is not None else "estimated"
         end_to_end_cost_model = (
             "feature_cost_v6"
             if "feature_cost_v6" in set(model_comparison["model"])

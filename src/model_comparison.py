@@ -71,6 +71,7 @@ def build_model_comparison(
                     "estimated_pim_time_ms": estimate["estimated_pim_time_ms"],
                     "risk": estimate["risk"],
                     "feature_summary": estimate["feature_summary"],
+                    "ncu_feature_coverage": estimate.get("ncu_feature_coverage", pd.NA),
                 }
             )
 
@@ -177,6 +178,7 @@ def _model_estimate(
             "estimated_pim_time_ms": feature_cost_v6["estimated_pim_time_ms"],
             "risk": feature_cost_v6["risk"],
             "feature_summary": feature_cost_v6["feature_summary"],
+            "ncu_feature_coverage": feature_cost_v6.get("ncu_feature_coverage", pd.NA),
         }
     return {
         "estimated_speedup": "",

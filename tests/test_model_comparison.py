@@ -3,6 +3,7 @@ import pandas as pd
 from src.config import HardwareConfig
 from src.cost_model_v3 import estimate_feature_cost_v3
 from src.cost_model_v4 import estimate_feature_cost_v4
+from src.cost_model_v6 import estimate_feature_cost_v6
 from src.model_comparison import build_model_comparison, estimate_pim_speedup
 from src.roofline import add_roofline_metrics
 from src.classifier import add_classifications
@@ -132,3 +133,38 @@ def test_feature_cost_v4_penalizes_high_reuse_dense_gemm() -> None:
     assert estimate["estimated_speedup"] < 1.0
     assert not estimate["predicted_candidate"]
     assert "high data reuse" in estimate["risk"]
+
+
+def test_feature_cost_v6_reports_partial_counter_coverage() -> None:
+    hardware = HardwareConfig(peak_flops=13.45e12, peak_memory_bandwidth=616e9)
+    profile_row = pd.Series(
+        {
+            "kernel_name": "vector_add",
+            "runtime_s": 0.00036,
+            "runtime_ms": 0.36,
+            "flops": 16_777_216.0,
+            "dram_bytes": 201_326_592.0,
+            "arithmetic_intensity": 0.0833,
+            "achieved_flops": 46e9,
+            "achieved_bandwidth": 555e9,
+            "memory_access_pattern": "regular",
+            "ncu_sol_dram_pct": 85.0,
+            "ncu_l1_hit_rate_pct": 0.0,
+            "ncu_l2_hit_rate_pct": 33.0,
+            "ncu_long_scoreboard_stall_pct": 91.0,
+        }
+    )
+    metadata_row = pd.Series(
+        {
+            "operation_complexity": "low",
+            "communication_intensity": "low",
+            "partitionability": "high",
+            "host_transfer_sensitivity": "low",
+            "data_reuse_potential": "low",
+        }
+    )
+
+    estimate = estimate_feature_cost_v6(profile_row, hardware, metadata_row)
+
+    assert 0 < estimate["ncu_feature_coverage"] < 0.75
+    assert "partial NCU coverage" in estimate["risk"]

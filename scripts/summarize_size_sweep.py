@@ -15,6 +15,7 @@ from src.classifier import add_classifications
 from src.config import HardwareConfig
 from src.model_comparison import build_model_comparison
 from src.parser import load_profile_csv
+from src.plot import save_size_sweep_plot
 from src.roofline import add_roofline_metrics
 
 
@@ -61,8 +62,10 @@ def main() -> None:
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(args.output_csv, index=False)
     args.output_markdown.write_text(_markdown_summary(summary), encoding="utf-8")
+    save_size_sweep_plot(summary, args.output_plot)
     print(f"Wrote size sweep summary CSV: {args.output_csv}")
     print(f"Wrote size sweep summary Markdown: {args.output_markdown}")
+    print(f"Wrote size sweep plot: {args.output_plot}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -71,6 +74,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--paper-baseline", type=Path, default=Path("paper_baselines/gpu_benchmark_metadata.csv"))
     parser.add_argument("--output-csv", type=Path, default=Path("outputs/size_sweep/size_sweep_summary.csv"))
     parser.add_argument("--output-markdown", type=Path, default=Path("outputs/size_sweep/size_sweep_summary.md"))
+    parser.add_argument("--output-plot", type=Path, default=Path("outputs/size_sweep/size_sweep.png"))
     parser.add_argument("--hardware-name", default="RTX 2080 Ti")
     parser.add_argument("--peak-flops", type=float, default=13.45e12)
     parser.add_argument("--peak-memory-bandwidth", type=float, default=616e9)

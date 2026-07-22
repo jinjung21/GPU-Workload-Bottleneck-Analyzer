@@ -70,6 +70,9 @@ feature_cost_v4 speedup threshold: estimated speedup >= 1.10
 feature_cost_v4 memory pressure floor: memory_pressure >= 0.25
 feature_cost_v4 risk cutoff: risk_score < 0.75
 feature_cost_v4 dense-reuse gate: high reuse + medium/high compute complexity is not a PIM candidate
+feature_cost_v6 speedup threshold: estimated speedup >= 1.10
+feature_cost_v6 opportunity floor: pim_opportunity >= 0.18
+feature_cost_v6 NCU calibration strength: proportional to available optional-counter coverage
 ```
 
 These thresholds are intentionally documented as calibration targets. They are
@@ -89,13 +92,13 @@ policy estimate:
 
 ```text
 if model predicts PIM candidate:
-    use feature_cost_v4 estimated PIM/NMP time
+    use latest available feature-cost model estimated PIM/NMP time
 else:
     use measured GPU runtime
 ```
 
-All policies use the same `feature_cost_v4` timing estimate when they offload a
-kernel. This isolates the quality of the offload decision from the cost formula.
+All policies use the same latest timing model when they offload a kernel. This
+isolates the quality of the offload decision from the cost formula.
 `gpu_only` is the measured GPU-runtime sum, and `oracle_labels` is an upper
 reference based on the current benchmark labels.
 
@@ -104,15 +107,25 @@ offloaded-kernel timing source:
 
 ```text
 if model predicts PIM candidate:
-    use simulated_pim_time_ms from the simulator adapter CSV when available
-    otherwise fall back to feature_cost_v4 estimated PIM/NMP time
+    use measured_gpu_runtime / simulated_speedup when simulator speedup is available
+    otherwise fall back to the latest feature-cost estimated PIM/NMP time
 else:
     use measured GPU runtime
 ```
 
-This is still not a silicon measurement. It is a simulator-backed estimate, and
-its confidence depends on the simulator backend, workload mapping, and input
-trace/kernel fidelity.
+The raw `simulated_pim_cycles * cycle_time_ns` value is retained for simulator
+traceability but is not directly added to GPU milliseconds. The two clocks are
+not calibrated to each other. This is still not a silicon measurement; it is a
+cross-domain, ratio-normalized estimate whose confidence depends on simulator
+fidelity and workload mapping.
+
+## Model Evaluation Interpretation
+
+Precision, recall, F1, and accuracy are calculated on the same nine workload
+labels used to guide the model design. They measure calibration-set label
+alignment, not generalization to unseen applications. A publishable accuracy
+claim requires held-out workloads, frozen thresholds, and preferably validation
+on another GPU and a real PIM platform.
 
 ## Current Evidence Levels
 
@@ -124,8 +137,17 @@ trace/kernel fidelity.
 | Benchmark FLOPs/DRAM bytes | Theoretical count from benchmark structure | Medium |
 | PIM/NMP score thresholds | Project heuristic | Low-medium |
 | analytical_v2 / feature_cost_v3 / feature_cost_v4 speedup | Analytical opportunity estimate | Low-medium |
-| `--pim-simulation` speedup | External simulator output + policy model | Simulator-dependent |
+| `feature_cost_v5` / `feature_cost_v6` decision | Measured GPU + partial NCU counters + calibrated model | Medium-low |
+| `--pim-simulation` speedup | External simulator ratio normalized to measured GPU runtime | Simulator-dependent |
 | PrIM workload labels | Literature-inspired workload categories | Medium |
+
+The report uses evidence tiers rather than statistical confidence intervals:
+
+```text
+Tier A: measured GPU + NCU + mapped PIM simulator result
+Tier B: measured GPU + NCU + analytical PIM estimate
+Tier C: measured GPU + analytical PIM estimate
+```
 
 ## Key References
 

@@ -75,6 +75,7 @@ python3 scripts/summarize_size_sweep.py \
   --paper-baseline "$PAPER_BASELINE" \
   --output-csv "$OUTPUT_DIR/size_sweep_summary.csv" \
   --output-markdown "$OUTPUT_DIR/size_sweep_summary.md" \
+  --output-plot "$OUTPUT_DIR/size_sweep.png" \
   --hardware-name "$HARDWARE_NAME" \
   --peak-flops "$PEAK_FLOPS" \
   --peak-memory-bandwidth "$PEAK_MEMORY_BANDWIDTH"
@@ -82,3 +83,4 @@ python3 scripts/summarize_size_sweep.py \
 echo "Wrote size sweep profiles: $PROFILE_DIR/gpu_profile_*.csv"
 echo "Wrote size sweep reports: $OUTPUT_DIR/{small,medium,large}/reports/analysis_report.md"
 echo "Wrote size sweep summary: $OUTPUT_DIR/size_sweep_summary.md"
+echo "Wrote size sweep plot: $OUTPUT_DIR/size_sweep.png"

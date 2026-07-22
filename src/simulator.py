@@ -66,53 +66,79 @@ def load_pim_simulation_csv(path: str | Path) -> pd.DataFrame:
 
 
 def attach_simulation_results(model_comparison: pd.DataFrame, simulation: pd.DataFrame | None) -> pd.DataFrame:
-    """Attach simulator timing rows to model comparison output by benchmark name."""
+    """Attach raw and GPU-normalized simulator results by benchmark name.
+
+    Simulator cycles belong to the simulator's own timing domain.  When the
+    simulator also reports a baseline-to-PIM speedup, that ratio is applied to
+    the measured GPU runtime so end-to-end totals do not directly mix unrelated
+    absolute clocks.
+    """
 
     result = model_comparison.copy()
     result["simulated_pim_time_ms"] = pd.NA
+    result["simulated_scaled_pim_time_ms"] = pd.NA
     result["simulated_pim_cycles"] = pd.NA
     result["simulated_baseline_cycles"] = pd.NA
     result["simulated_speedup"] = pd.NA
     result["cycle_time_ns"] = pd.NA
     result["simulator"] = ""
     result["simulation_notes"] = ""
+    result["simulation_time_basis"] = ""
     if simulation is None:
         return result
 
     sim_by_name = simulation.set_index("normalized_kernel").to_dict(orient="index")
     simulated_times = []
+    simulated_scaled_times = []
     simulated_pim_cycles = []
     simulated_baseline_cycles = []
     simulated_speedups = []
     cycle_times = []
     simulator_names = []
     simulation_notes = []
-    for benchmark in result["benchmark"]:
+    simulation_time_bases = []
+    for _, row in result.iterrows():
+        benchmark = row["benchmark"]
         matched = sim_by_name.get(_normalize_name(benchmark))
         if matched is None:
             simulated_times.append(pd.NA)
+            simulated_scaled_times.append(pd.NA)
             simulated_pim_cycles.append(pd.NA)
             simulated_baseline_cycles.append(pd.NA)
             simulated_speedups.append(pd.NA)
             cycle_times.append(pd.NA)
             simulator_names.append("")
             simulation_notes.append("")
+            simulation_time_bases.append("")
             continue
-        simulated_times.append(float(matched["simulated_pim_time_ms"]))
+        raw_time_ms = float(matched["simulated_pim_time_ms"])
+        speedup = matched.get("simulated_speedup", pd.NA)
+        gpu_runtime_ms = pd.to_numeric(row.get("gpu_runtime_ms"), errors="coerce")
+        if pd.notna(speedup) and float(speedup) > 0 and pd.notna(gpu_runtime_ms) and float(gpu_runtime_ms) > 0:
+            scaled_time_ms = float(gpu_runtime_ms) / float(speedup)
+            time_basis = "simulator speedup scaled to measured GPU runtime"
+        else:
+            scaled_time_ms = pd.NA
+            time_basis = "raw simulator time only"
+        simulated_times.append(raw_time_ms)
+        simulated_scaled_times.append(scaled_time_ms)
         simulated_pim_cycles.append(matched.get("simulated_pim_cycles", pd.NA))
         simulated_baseline_cycles.append(matched.get("simulated_baseline_cycles", pd.NA))
-        simulated_speedups.append(matched.get("simulated_speedup", pd.NA))
+        simulated_speedups.append(speedup)
         cycle_times.append(matched.get("cycle_time_ns", pd.NA))
         simulator_names.append(str(matched["simulator"]))
         simulation_notes.append(str(matched.get("notes", "")))
+        simulation_time_bases.append(time_basis)
 
     result["simulated_pim_time_ms"] = simulated_times
+    result["simulated_scaled_pim_time_ms"] = simulated_scaled_times
     result["simulated_pim_cycles"] = simulated_pim_cycles
     result["simulated_baseline_cycles"] = simulated_baseline_cycles
     result["simulated_speedup"] = simulated_speedups
     result["cycle_time_ns"] = cycle_times
     result["simulator"] = simulator_names
     result["simulation_notes"] = simulation_notes
+    result["simulation_time_basis"] = simulation_time_bases
     return result
 
 

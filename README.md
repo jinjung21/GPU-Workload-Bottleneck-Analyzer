@@ -8,6 +8,20 @@ Roofline 모델을 기반으로 GPU kernel profiling 데이터를 분석해 memo
 - CUDA benchmark profiling: RTX 2080 Ti 서버에서 CUDA benchmark를 실행하고 실제 GPU runtime 기반 CSV를 생성합니다.
 - Nsight Compute counter profiling: NCU가 측정한 DRAM/SM/L1/L2/occupancy/cache/stall metric을 모델 feature로 사용합니다.
 
+최종 pipeline은 다음 순서로 동작합니다.
+
+```text
+CUDA event + theoretical traffic
+  -> Roofline bottleneck classification
+  -> Nsight Compute cache/stall evidence
+  -> feature_cost_v6 offload decision
+  -> SAIT PIMSimulator speedup cross-check
+  -> GPU-runtime-scaled end-to-end policy estimate
+  -> size sweep and reproducible report
+```
+
+이 저장소는 GPU/PIM 실리콘을 직접 비교하는 제품형 예측기가 아니라, 측정값과 모델 가정을 분리해 PIM/NMP 후보를 좁히는 재현 가능한 연구 프로토타입입니다.
+
 ## Project Goal
 
 이 프로젝트의 목적은 GPU workload의 병목을 정량화하고, PIM/NMP offloading 후보를 여러 baseline model과 비교 가능한 방식으로 선별하는 것입니다. 현재는 Roofline metric, PrIM-inspired proxy baseline, CUDA event runtime, `nvprof` log, SAIT PIMSimulator output, Nsight Compute counter를 조합해 end-to-end pipeline을 구성했습니다.
@@ -126,6 +140,7 @@ ncu_long_scoreboard_stall_pct
 `feature_cost_v5`는 `vector_add`처럼 NCU에서 `SOL DRAM`이 높고 `SM [%]`가 낮게 나온 kernel을 실제 DRAM-bound로 더 강하게 확인하고, 반대로 SM/cache/reuse signal이 강한 kernel은 PIM 후보에서 더 보수적으로 처리합니다.
 `feature_cost_v6`는 cache hit가 높고 warp/control-flow risk가 큰 workload를 GPU-friendly로 더 보수적으로 보고, cache hit가 낮고 long scoreboard/memory stall이 높은 workload를 PIM/NMP opportunity로 더 강하게 봅니다.
 또한 상세 NCU run에서 `SM [%]`나 occupancy가 수집되지 않은 경우 실제 0으로 취급하지 않고 `NA`로 유지합니다. `reduction`, `scan`처럼 synchronization phase가 있지만 memory primitive 성격이 강한 workload는 `collective memory primitive` 신호를 별도로 반영합니다.
+v6는 사용 가능한 선택 counter 비율을 `ncu_feature_coverage`로 계산하고, coverage가 낮을수록 v5 비용에서 멀리 보정되지 않도록 calibration 강도를 줄입니다. 현재 RTX 2080 Ti/Nsight Compute 2020.1.1 데이터는 핵심 cache, scheduler, long-scoreboard 신호를 제공하지만 모든 최신 counter를 제공하지 않으므로 partial coverage가 report에 표시됩니다.
 
 The report also includes an end-to-end policy estimate:
 
@@ -422,7 +437,16 @@ python3 main.py \
   --peak-memory-bandwidth 616000000000
 ```
 
-`--pim-simulation`을 사용하면 end-to-end policy estimate에서 offload된 kernel은 simulated PIM runtime을 우선 사용합니다. Simulator coverage가 없는 kernel은 analytical estimate로 fallback하고, GPU에 남긴 kernel은 measured GPU runtime을 그대로 사용합니다.
+`--pim-simulation`을 사용하면 end-to-end policy estimate에서 offload된 kernel은 GPU runtime에 정규화한 simulator speedup 기반 시간을 우선 사용합니다. Simulator coverage가 없는 kernel은 analytical estimate로 fallback하고, GPU에 남긴 kernel은 measured GPU runtime을 그대로 사용합니다.
+
+중요한 시간축 처리:
+
+```text
+raw simulator time = simulated_pim_cycles * cycle_time_ns
+cross-domain PIM time = measured_gpu_runtime / simulator_reported_speedup
+```
+
+SAIT PIMSimulator의 cycle은 simulator 내부 시간축이므로 RTX 2080 Ti의 밀리초와 직접 더하지 않습니다. 원시 cycle 변환값은 추적용으로 보존하고, end-to-end 합산에는 simulator의 PIM-disabled 대비 speedup을 측정 GPU runtime에 적용한 `simulated_scaled_pim_time_ms`를 사용합니다. 이 값이 없는 kernel만 feature-cost analytical estimate로 fallback합니다.
 
 서버 결과를 로컬 Mac으로 가져올 때는 프로젝트 루트에서 다음 helper를 사용할 수 있습니다.
 
@@ -473,6 +497,8 @@ outputs/<run_name>/figures/roofline.png
 outputs/<run_name>/figures/model_comparison.png
 outputs/<run_name>/figures/end_to_end.png
 outputs/<run_name>/reports/analysis_report.md
+outputs/size_sweep/size_sweep.png
+output/pdf/gpu_pim_bottleneck_analyzer_portfolio_report.pdf
 ```
 
 ## Input CSV Schema
@@ -493,15 +519,47 @@ notes
 - `PIM/NMP score`는 아직 calibration 전의 heuristic component를 포함합니다.
 - `feature_cost_v3`/`feature_cost_v4`는 실제 PIM hardware 측정값이 아니라 analytical opportunity estimate입니다.
 - `--pim-simulation` 결과는 simulator 기반 결과이며 실제 PIM silicon 측정값은 아닙니다.
+- Model precision/recall/F1은 현재 9개 labeled calibration workload에서의 정합도이며 독립 test-set 일반화 정확도가 아닙니다.
+- SAIT PIMSimulator mapping은 9개 benchmark 중 4개만 포함하며 나머지 PIM 시간은 analytical fallback입니다.
 - Roofline을 초과하는 측정값은 단위 오류 또는 hardware config 오류 가능성이 있으므로 report에 별도 표시합니다.
 - 현재 CUDA benchmark의 FLOPs/DRAM bytes는 benchmark 구조에서 계산한 theoretical count입니다.
-- 현재 CUDA benchmark suite는 작으며, 더 다양한 memory access pattern과 problem size sweep이 필요합니다.
+- Size sweep은 small/medium/large 세 단계이며, 더 다양한 application benchmark와 architecture에서 외부 검증이 필요합니다.
 
 ## Future Work
 
-- 더 다양한 실제 GPU benchmark metadata와 size sweep 추가
+- 독립 application benchmark와 다른 GPU architecture에서 held-out validation
 - Nsight Compute metric coverage 확대: memory transaction count, warp execution efficiency, stall reason
 - `feature_cost_v6` threshold를 더 많은 benchmark와 size sweep으로 calibration
 - PIM/NMP model threshold와 risk parameter를 논문/실측 데이터 기반으로 calibration
 - SAIT PIMSimulator 또는 Ramulator-PIM adapter 추가
 - PrIM/UPMEM case study와 실제 RTX 2080 Ti profiling 결과 비교
+
+## Final Reproducible Server Run
+
+서버에서 최종 결과를 처음부터 다시 생성하는 권장 순서입니다.
+
+```bash
+cd ~/GPU-Workload-Bottleneck-Analyzer
+git pull
+source .venv/bin/activate
+pip install -r requirements.txt
+python3 -m pytest
+bash scripts/build_benchmarks.sh
+bash scripts/profile_nvprof.sh
+bash scripts/profile_ncu.sh
+python3 scripts/parse_ncu_reports.py --input-dir profiles/ncu --output profiles/ncu_metrics.csv
+python3 scripts/parse_sait_pim_logs.py --log-dir ~/pim-tools/pim-results --output simulators/sait_pim_simulation.csv --cycle-time-ns 1.0
+python3 main.py --input profiles/gpu_profile.csv --paper-baseline paper_baselines/gpu_benchmark_metadata.csv --pim-simulation simulators/sait_pim_simulation.csv --ncu-metrics profiles/ncu_metrics.csv --output-dir outputs/gpu_profile_with_sait_pim_ncu --hardware-name "RTX 2080 Ti" --peak-flops 13450000000000 --peak-memory-bandwidth 616000000000
+bash scripts/profile_size_sweep.sh
+```
+
+로컬 Mac에서 결과를 가져옵니다.
+
+```bash
+cd /Users/kingjung/Desktop/gpu-bottleneck-analyzer
+git pull
+bash scripts/fetch_server_results.sh gpu_profile_with_sait_pim_ncu
+open outputs/gpu_profile_with_sait_pim_ncu/reports/analysis_report.md
+open outputs/size_sweep/size_sweep_summary.md
+open outputs/size_sweep/size_sweep.png
+```

@@ -112,3 +112,67 @@ def test_end_to_end_evaluation_falls_back_when_simulation_is_partial() -> None:
     feature_v4 = evaluation[evaluation["model"] == "feature_cost_v4"].iloc[0]
 
     assert feature_v4["total_runtime_ms"] == 0.9
+
+
+def test_end_to_end_evaluation_scales_simulator_speedup_to_gpu_runtime() -> None:
+    comparison = pd.DataFrame(
+        [
+            {
+                "model": "feature_cost_v6",
+                "benchmark": "vector_add",
+                "target_candidate": True,
+                "predicted_candidate": True,
+                "gpu_runtime_ms": 2.0,
+                "estimated_pim_time_ms": 0.25,
+                "simulated_pim_time_ms": 0.003,
+                "simulated_scaled_pim_time_ms": 1.0,
+            },
+            {
+                "model": "feature_cost_v6",
+                "benchmark": "scan",
+                "target_candidate": True,
+                "predicted_candidate": True,
+                "gpu_runtime_ms": 3.0,
+                "estimated_pim_time_ms": 0.75,
+                "simulated_pim_time_ms": pd.NA,
+                "simulated_scaled_pim_time_ms": pd.NA,
+            },
+        ]
+    )
+
+    evaluation = build_end_to_end_evaluation(
+        comparison,
+        cost_model="feature_cost_v6",
+        runtime_source="simulator_scaled",
+    )
+    model = evaluation[evaluation["model"] == "feature_cost_v6"].iloc[0]
+
+    assert model["total_runtime_ms"] == 1.75
+    assert model["simulator_backed_offloads"] == 1
+    assert model["analytical_fallback_offloads"] == 1
+
+
+def test_simulator_scaled_source_falls_back_when_columns_are_absent() -> None:
+    comparison = pd.DataFrame(
+        [
+            {
+                "model": "feature_cost_v6",
+                "benchmark": "scan",
+                "target_candidate": True,
+                "predicted_candidate": True,
+                "gpu_runtime_ms": 3.0,
+                "estimated_pim_time_ms": 0.75,
+            }
+        ]
+    )
+
+    evaluation = build_end_to_end_evaluation(
+        comparison,
+        cost_model="feature_cost_v6",
+        runtime_source="simulator_scaled",
+    )
+    model = evaluation[evaluation["model"] == "feature_cost_v6"].iloc[0]
+
+    assert model["total_runtime_ms"] == 0.75
+    assert model["simulator_backed_offloads"] == 0
+    assert model["analytical_fallback_offloads"] == 1
