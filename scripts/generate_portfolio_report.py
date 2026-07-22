@@ -240,7 +240,7 @@ def _cover(s: dict[str, ParagraphStyle]) -> list[object]:
             [
                 ("9", "CUDA workloads"),
                 ("v6", "cache/stall-aware model"),
-                ("30", "automated tests"),
+                ("31", "automated tests"),
                 ("2.36x", "modeled policy speedup"),
             ],
             s,
@@ -434,7 +434,7 @@ def _implementation_history(s: dict[str, ParagraphStyle]) -> list[object]:
             "• 외부 PIM simulator를 vendoring하지 않고 adapter CSV schema로 연결했다.<br/>"
             "• 오래된 NCU 2020.1.1에서도 동작하도록 optional metric과 NA 처리를 지원했다.<br/>"
             "• benchmark는 --n, --rows, --cols, --iterations를 받아 반복 실험이 가능하다.<br/>"
-            "• 30개 automated test로 parser, model, simulator, end-to-end 계약을 고정했다.",
+            "• 31개 automated test로 parser, model, simulator, end-to-end 계약을 고정했다.",
             s["callout"],
         ),
         Paragraph("코드 구성", s["h2"]),
@@ -626,7 +626,7 @@ def _validation_and_limits(s: dict[str, ParagraphStyle]) -> list[object]:
         _table(
             [
                 ["검증", "결과", "남는 위험"],
-                ["Automated tests", "30 passed", "실제 GPU/NCU 실행은 서버 필요"],
+                ["Automated tests", "31 passed", "실제 GPU/NCU 실행은 서버 필요"],
                 ["Calibration labels", "F1 1.00 for v4/v6", "held-out accuracy 아님"],
                 ["Control workloads", "3/3 pass", "control 수가 작음"],
                 ["Size sweep", "3 scales stable", "application diversity 제한"],
@@ -704,7 +704,7 @@ open output/pdf/gpu_pim_bottleneck_analyzer_portfolio_report.pdf"""
         Paragraph("11.3 성공 판정", s["h2"]),
         Paragraph(
             "정상 완료 시 profiles/gpu_profile.csv에 9개 row, profiles/ncu_metrics.csv에 9개 kernel, simulator CSV에 4개 mapping, "
-            "최종 Markdown report와 3개 figure, size sweep 3개 profile과 summary/plot이 있어야 한다. `python3 -m pytest`는 30 tests passed를 출력해야 한다.",
+            "최종 Markdown report와 3개 figure, size sweep 3개 profile과 summary/plot이 있어야 한다. `python3 -m pytest`는 31 tests passed를 출력해야 한다.",
             s["callout"],
         ),
         PageBreak(),
@@ -798,15 +798,19 @@ def _metric_cards(items: list[tuple[str, str]], s: dict[str, ParagraphStyle]) ->
 def _table(data: list[list[str]], widths: list[float], s: dict[str, ParagraphStyle]) -> Table:
     wrapped = []
     for row_index, row in enumerate(data):
-        style = s["small"]
-        wrapped.append([Paragraph(str(value), style) for value in row])
+        if row_index == 0:
+            wrapped.append(
+                [Paragraph(f"<font color='#FFFFFF'>{value}</font>", s["small"]) for value in row]
+            )
+        else:
+            wrapped.append([Paragraph(str(value), s["small"]) for value in row])
     table = Table(wrapped, colWidths=widths, repeatRows=1, hAlign="LEFT")
     table.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), INK),
                 ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
-                ("FONTNAME", (0, 0), (-1, -1), "Korean"),
+                ("FONTNAME", (0, 0), (-1, -1), s["small"].fontName),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("GRID", (0, 0), (-1, -1), 0.45, LINE),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, colors.HexColor("#F7F9FA")]),
